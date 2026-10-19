@@ -85,3 +85,23 @@ func TestRoles(t *testing.T) {
 		t.Error("unknown role grants something")
 	}
 }
+
+func TestSafeName(t *testing.T) {
+	for in, want := range map[string]string{
+		"diagram.png":            "diagram.png",
+		"../../etc/passwd":       "passwd",
+		`C:\Users\me\shot 1.png`: "shot_1.png",
+		".bashrc":                "bashrc",
+		"résumé.pdf":             "r_sum_.pdf",
+		"":                       "file",
+		"...":                    "file",
+		"a;rm -rf ~.txt":         "a_rm_-rf__.txt",
+	} {
+		if got := safeName(in); got != want {
+			t.Errorf("safeName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := safeName(strings.Repeat("x", 300) + ".png"); len(got) > 100 || !strings.HasSuffix(got, ".png") {
+		t.Errorf("long name: %q", got)
+	}
+}

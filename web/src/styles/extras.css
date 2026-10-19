@@ -51,63 +51,55 @@
   }
 }
 
-/* Banked embers: a window without focus cools at once (less colour, a little
-   less light) and warms back up over 0.45 s when it takes focus again. */
-.ember-bank {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483000;
-  pointer-events: none;
-  -webkit-backdrop-filter: saturate(0.7) brightness(0.9);
-  backdrop-filter: saturate(0.7) brightness(0.9);
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 0.45s ease-out,
-    visibility 0s linear 0.45s;
-}
-html.ember-banked .ember-bank {
-  opacity: 1;
-  visibility: visible;
-  transition: none;
-}
+/* Bank the decorative plate, not the text. Unfocused windows stay readable. */
+canvas[data-ember-fx] { transition: filter 450ms ease-out; }
+html.ember-banked canvas[data-ember-fx] { filter: saturate(0.7) brightness(0.9); }
 
-@media (prefers-reduced-motion: reduce) {
-  .beacon.working,
-  .beacon.blocked,
-  .state-pill.beacon i,
-  .connection.reconnecting i {
-    animation: none !important;
-  }
-  .ember-bank,
-  .toast {
-    transition: none;
-    animation: none;
-  }
-}
-
-/* Glass: the main panes let the plate behind them show through, the way the
-   terminal and herdr's sidebar sit over theirs. Only while the effects run; on a
-   phone the sidebar is the whole screen, and there it stays a little more solid. */
+/* Glass surfaces catch a fine upper rim. The source of the warm light is the
+   plate, not a second glow on every control. */
 html[data-ember-fx="on"] .topbar {
-  background: color-mix(in srgb, var(--ember-glass-high) 62%, transparent);
+  background: linear-gradient(110deg, rgb(17 24 41 / 0.8), rgb(11 17 32 / 0.55));
+  box-shadow: inset 0 1px rgb(244 247 251 / 0.025), 0 8px 24px rgb(0 0 0 / 0.08);
 }
 html[data-ember-fx="on"] .sidebar {
-  background: color-mix(in srgb, var(--ember-glass-high) 40%, transparent);
+  background: linear-gradient(155deg, rgb(17 24 41 / 0.68), rgb(7 11 22 / 0.48));
+  border-top-color: #303c55;
+  box-shadow: inset 0 1px rgb(244 247 251 / 0.025), 0 12px 32px rgb(0 0 0 / 0.15);
 }
-html[data-ember-fx="on"] .term-host {
-  background: color-mix(in srgb, var(--ember-glass) 55%, transparent);
-}
+html[data-ember-fx="on"] .pane-view { border-top-color: #303c55; }
+html[data-ember-fx="on"] .term-host { background: rgb(7 11 22 / 0.58); }
 html[data-ember-fx="on"] .pane-head,
 html[data-ember-fx="on"] .pane-foot,
-html[data-ember-fx="on"] .notice {
-  background: color-mix(in srgb, var(--ember-glass-high) 62%, transparent);
+html[data-ember-fx="on"] .notice.info { background: rgb(11 17 32 / 0.68); }
+html[data-ember-fx="on"] .readouts,
+html[data-ember-fx="on"] .wait-cards,
+html[data-ember-fx="on"] .console-panel {
+  background-image: linear-gradient(125deg, rgb(244 247 251 / 0.018), transparent 65%);
+  box-shadow: inset 0 1px rgb(244 247 251 / 0.025), 0 8px 24px rgb(0 0 0 / 0.06);
 }
-html[data-ember-fx="on"] .tree-row .mark .dot {
-  box-shadow: 0 0 0 2px #0a0f1d;
-}
+html[data-ember-fx="on"] .coral,
+html[data-ember-fx="on"] .accent-tick { text-shadow: var(--ember-halo); }
+html[data-ember-fx="on"] .tree-row .mark .dot { box-shadow: 0 0 0 2px #0a0f1d; }
 @media (max-width: 700px) {
-  html[data-ember-fx="on"] .sidebar {
-    background: color-mix(in srgb, var(--ember-glass-high) 55%, transparent);
-  }
+  html[data-ember-fx="on"] .sidebar { background-color: rgb(7 11 22 / 0.3); }
+}
+
+/* Effects off means CSS effects too, including future controls. State colours,
+   focus outlines and the layout remain; no blur, glow, transitions or movement. */
+html[data-ember-fx="off"] *,
+html[data-ember-fx="off"] *::before,
+html[data-ember-fx="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-ember-fx="off"] .modal,
+html[data-ember-fx="off"] .gate-card,
+html[data-ember-fx="off"] .empty-card { background: var(--ember-panel); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

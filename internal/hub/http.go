@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -29,44 +30,75 @@ const (
 
 // Web is the hub's HTTP side.
 type Web struct {
-	h       *Hub
-	hosts   map[string]bool // allowed Host headers
-	origins map[string]bool // allowed Origin values
-	secure  bool            // HTTPS: cookies are Secure
-	base    string          // the URL people use, for links and install
+	h      *Hub
+	listen string   // the address it listens on (always allowed, for SSH tunnels)
+	extra  []string // extra allowed origins (dev servers)
+	cfg    atomic.Pointer[webCfg]
 }
 
-// NewWeb configures the allowed names. base is the page's own URL, e.g.
-// http://127.0.0.1:4790 or https://fleet.example.com.
-func NewWeb(h *Hub, base string, extraOrigins []string) (*Web, error) {
-	w := &Web{h: h, hosts: map[string]bool{}, origins: map[string]bool{}, base: strings.TrimRight(base, "/")}
+// webCfg is which names the hub answers to; set-url replaces it live.
+type webCfg struct {
+	base    string          // the URL people use, for links and install
+	hosts   map[string]bool // allowed Host headers
+	origins map[string]bool // allowed Origin values
+	secure  bool            // the base is HTTPS
+}
+
+// NewWeb configures the allowed names. listen is the address the hub listens
+// on; public, if set, is the URL people use (https://fleet.example.com),
+// for a hub behind a TLS proxy or serving HTTPS itself.
+func NewWeb(h *Hub, listen, public string, extraOrigins []string) (*Web, error) {
+	w := &Web{h: h, listen: listen, extra: extraOrigins}
+	return w, w.setURL(public)
+}
+
+// setURL switches the public URL ("" means the listen address).
+func (w *Web) setURL(public string) error {
+	c := &webCfg{hosts: map[string]bool{}, origins: map[string]bool{}}
 	add := func(o string) error {
 		u, err := url.Parse(o)
-		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-			return errors.New("bad origin " + o)
+		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.Path != "" && u.Path != "/" {
+			return errors.New("bad address " + o + " (use e.g. https://fleet.example.com)")
 		}
-		w.hosts[u.Host] = true
-		w.origins[u.Scheme+"://"+u.Host] = true
+		c.hosts[u.Host] = true
+		c.origins[u.Scheme+"://"+u.Host] = true
 		if host, port, err := net.SplitHostPort(u.Host); err == nil && host == "127.0.0.1" {
-			w.hosts["localhost:"+port] = true
-			w.origins[u.Scheme+"://localhost:"+port] = true
+			c.hosts["localhost:"+port] = true
+			c.origins[u.Scheme+"://localhost:"+port] = true
 		}
 		return nil
 	}
-	if err := add(w.base); err != nil {
-		return nil, err
-	}
-	for _, o := range extraOrigins {
-		if err := add(o); err != nil {
-			return nil, err
+	if w.listen != "" {
+		if err := add("http://" + w.listen); err != nil {
+			return err
 		}
 	}
-	w.secure = strings.HasPrefix(w.base, "https://")
-	return w, nil
+	c.base = "http://" + w.listen
+	if public != "" {
+		public = strings.TrimRight(public, "/")
+		if err := add(public); err != nil {
+			return err
+		}
+		c.base = public
+	}
+	for _, o := range w.extra {
+		if err := add(o); err != nil {
+			return err
+		}
+	}
+	c.secure = strings.HasPrefix(c.base, "https://")
+	w.cfg.Store(c)
+	return nil
 }
 
 // Base is the page's URL.
-func (w *Web) Base() string { return w.base }
+func (w *Web) Base() string { return w.cfg.Load().base }
+
+// secureReq says whether cookies for this request should be Secure: when the
+// browser reached us over HTTPS (directly or through a TLS proxy).
+func (w *Web) secureReq(r *http.Request) bool {
+	return r.TLS != nil || strings.HasPrefix(r.Header.Get("Origin"), "https://")
+}
 
 // Handler returns the whole site.
 func (w *Web) Handler() http.Handler {
@@ -84,6 +116,14 @@ func (w *Web) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/links/{id}", w.auth(w.cancelLink))
 	mux.HandleFunc("DELETE /api/docks/{id}", w.auth(w.removeDock))
 	mux.HandleFunc("POST /api/docks/{id}/rename", w.auth(w.renameDock))
+	mux.HandleFunc("POST /api/fleet", w.auth(w.renameFleet))
+	mux.HandleFunc("GET /api/groups", w.auth(w.listGroups))
+	mux.HandleFunc("POST /api/groups", w.auth(w.createGroup))
+	mux.HandleFunc("PATCH /api/groups/{id}", w.auth(w.updateGroup))
+	mux.HandleFunc("DELETE /api/groups/{id}", w.auth(w.deleteGroup))
+	mux.HandleFunc("POST /api/groups/move", w.auth(w.moveMember))
+	mux.HandleFunc("POST /api/groups/reorder", w.auth(w.reorderGroups))
+	mux.HandleFunc("POST /api/upload", w.auth(w.upload))
 	mux.HandleFunc("GET /api/tokens", w.auth(w.listTokens))
 	mux.HandleFunc("POST /api/tokens", w.auth(w.createToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", w.auth(w.revokeToken))
@@ -97,7 +137,8 @@ func (w *Web) Handler() http.Handler {
 // safe headers on everything.
 func (w *Web) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		if !w.hosts[r.Host] {
+		c := w.cfg.Load()
+		if !c.hosts[r.Host] {
 			http.Error(rw, "unknown host", http.StatusMisdirectedRequest)
 			return
 		}
@@ -106,7 +147,7 @@ func (w *Web) guard(next http.Handler) http.Handler {
 		hd.Set("Referrer-Policy", "no-referrer")
 		hd.Set("X-Frame-Options", "DENY")
 		hd.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
-		if w.secure {
+		if r.TLS != nil {
 			hd.Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		next.ServeHTTP(rw, r)
@@ -125,7 +166,7 @@ type authed func(rw http.ResponseWriter, r *http.Request, p principal)
 
 func (w *Web) originOK(r *http.Request) bool {
 	o := r.Header.Get("Origin")
-	return o != "" && w.origins[o]
+	return o != "" && w.cfg.Load().origins[o]
 }
 
 // auth accepts a browser session (cookie + CSRF + Origin for anything that
@@ -250,14 +291,14 @@ func (w *Web) signin(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(rw, &http.Cookie{
-		Name: cookieName, Value: cookie, Path: "/", HttpOnly: true, Secure: w.secure,
+		Name: cookieName, Value: cookie, Path: "/", HttpOnly: true, Secure: w.secureReq(r),
 		SameSite: http.SameSiteStrictMode, MaxAge: int(sessionLife / time.Second),
 	})
 	jsonOut(rw, map[string]any{"ok": true, "csrf": csrf})
 }
 
 func (w *Web) signout(rw http.ResponseWriter, r *http.Request, p principal) {
-	http.SetCookie(rw, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: w.secure, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(rw, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: w.secureReq(r), SameSite: http.SameSiteStrictMode})
 	if c, err := r.Cookie(cookieName); err == nil {
 		if err := w.h.endSession(c.Value); err != nil {
 			jsonErr(rw, http.StatusInternalServerError, "signed out until the hub restarts, but it could not save that: "+err.Error())
@@ -294,7 +335,7 @@ func (w *Web) liveWS(rw http.ResponseWriter, r *http.Request, p principal) {
 		return c.Write(wctx, websocket.MessageText, b)
 	}
 	machines := w.h.Machines()
-	if send(map[string]any{"type": "hello", "fleet": map[string]any{"machines": machines}}) != nil {
+	if send(map[string]any{"type": "hello", "fleet": map[string]any{"machines": machines}, "groups": w.h.Groups()}) != nil {
 		return
 	}
 	known := map[string]bool{}
@@ -320,12 +361,22 @@ func (w *Web) liveWS(rw http.ResponseWriter, r *http.Request, p principal) {
 		case <-ctx.Done():
 			return
 		}
-		dirty, all := sub.take()
+		ch := sub.take()
+		if ch.fleet {
+			if send(map[string]any{"type": "fleet", "name": w.h.FleetName()}) != nil {
+				return
+			}
+		}
+		if ch.groups {
+			if send(map[string]any{"type": "groups", "groups": w.h.Groups()}) != nil {
+				return
+			}
+		}
 		machines := w.h.Machines()
 		now := map[string]bool{}
 		for _, m := range machines {
 			now[m.Host] = true
-			if all || dirty[m.Host] || !known[m.Host] {
+			if ch.all || ch.dirty[m.Host] || !known[m.Host] {
 				if send(map[string]any{"type": "machine", "machine": m}) != nil {
 					return
 				}
@@ -365,10 +416,11 @@ func (w *Web) createLink(rw http.ResponseWriter, r *http.Request, p principal) {
 // installCommandFor is what to run for a new machine. A hub on loopback can't
 // be reached from other computers, so then it's the SSH helper instead.
 func (w *Web) installCommandFor(name string) string {
-	if u, err := url.Parse(w.base); err == nil && isLoopbackHost(u.Hostname()) {
+	base := w.Base()
+	if u, err := url.Parse(base); err == nil && isLoopbackHost(u.Hostname()) {
 		return "scripts/add-host.sh " + shellWord(name) + " USER@HOST"
 	}
-	return "curl -fsSL " + w.base + "/install.sh | sh"
+	return "curl -fsSL " + base + "/install.sh | sh"
 }
 
 func (w *Web) installCommand() string { return w.installCommandFor("NAME") }
@@ -463,7 +515,7 @@ func (w *Web) createToken(rw http.ResponseWriter, r *http.Request, p principal) 
 		jsonErr(rw, http.StatusBadRequest, err.Error())
 		return
 	}
-	jsonOut(rw, map[string]any{"token": tok, "command": "ember-fleet login " + w.base})
+	jsonOut(rw, map[string]any{"token": tok, "command": "ember-fleet login " + w.Base()})
 }
 
 func (w *Web) revokeToken(rw http.ResponseWriter, r *http.Request, p principal) {

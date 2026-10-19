@@ -39,7 +39,7 @@ Set up (once):
 
 Run (normally as services, see 'service'):
   ember-fleet relay serve
-  ember-fleet hub serve [--listen 127.0.0.1:4790] [--public DOMAIN] [--dev-origin URL]
+  ember-fleet hub serve [--listen 127.0.0.1:4790] [--url https://... | --public DOMAIN] [--dev-origin URL]
   ember-fleet dock serve
 
 Use:
@@ -52,6 +52,7 @@ Use:
 
 Manage:
   ember-fleet service install|remove relay|hub|dock [--system] [-- serve flags]
+  ember-fleet hub set-url https://fleet.example.com   the address a TLS proxy serves the hub at
   ember-fleet relay hub-link | relay status
   ember-fleet leave                           remove this user's dock from its fleet
   ember-fleet version
@@ -323,12 +324,25 @@ func hubCmd(ctx context.Context, args []string) error {
 		}
 		fmt.Printf("Hub set up (key %s). Start it: ember-fleet service install hub\nThen: ember-fleet login-link\n", keys.Short(id.Fingerprint))
 		return nil
+	case "set-url":
+		if len(args) != 2 {
+			return errors.New("usage: ember-fleet hub set-url https://fleet.example.com   (or \"\" to use the listen address)")
+		}
+		var res struct {
+			Base string `json:"base"`
+		}
+		if err := admin.Call(hub.AdminPath(), "set-url", map[string]string{"url": args[1]}, &res); err != nil {
+			return hubErr(err)
+		}
+		fmt.Printf("The hub now answers as %s (sign-in links, install command and allowed origins use it).\n", res.Base)
+		return nil
 	case "serve":
 		fs := flag.NewFlagSet("hub serve", flag.ExitOnError)
 		var o hub.Options
 		var dev multi
 		fs.StringVar(&o.Listen, "listen", "127.0.0.1:4790", "address for the page (loopback unless behind your own TLS)")
 		fs.StringVar(&o.Public, "public", "", "serve HTTPS for this domain on :443 with Let's Encrypt")
+		fs.StringVar(&o.URL, "url", "", "public https:// URL when a TLS proxy (Pangolin, Caddy...) forwards to --listen")
 		fs.StringVar(&o.Email, "email", "", "contact address for Let's Encrypt")
 		fs.Var(&dev, "dev-origin", "extra allowed page origin (the Vite dev server)")
 		fs.Parse(args[1:])

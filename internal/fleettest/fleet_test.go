@@ -36,7 +36,8 @@ func (f *fleet) home(name string) {
 func start(t *testing.T) *fleet {
 	t.Helper()
 	root := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "xdg")) // no herdr sessions here
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "xdg"))  // no herdr sessions here
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache")) // uploads land here
 	t.Setenv("EMBER_FLEET_HOME", "")
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -285,3 +286,89 @@ func TestLinkRoundTrip(t *testing.T) {
 		t.Fatal("truncated link accepted")
 	}
 }
+
+func TestUploadLandsOnTheMachine(t *testing.T) {
+	f := start(t)
+	link, _, err := f.hub.CreateLink(f.ctx, "studio")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, fp := f.joinDock("a", link)
+	f.eventually("paired", func() bool { return f.onlineWithInfo(fp) })
+	body := strings.Repeat("ember ", 50000) // 300 kB, several relay chunks
+	path, _, err := f.hub.Upload(f.ctx, "test", fp, "default", "w1:p1", "../../evil name.txt", strings.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(path, dock.UploadDir()) || !strings.HasSuffix(path, "-evil_name.txt") {
+		t.Fatalf("unexpected path %q", path)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != body {
+		t.Fatalf("file content mismatch (%v)", err)
+	}
+	if st, _ := os.Stat(path); st.Mode().Perm() != 0o600 {
+		t.Fatalf("file mode %v", st.Mode().Perm())
+	}
+}
+
+func TestGroups(t *testing.T) {
+	f := start(t)
+	physics, err := f.hub.CreateGroup("Physics", "violet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	coding, _ := f.hub.CreateGroup("Coding", "")
+	if _, err := f.hub.CreateGroup("", ""); err == nil {
+		t.Fatal("empty name accepted")
+	}
+	if _, err := f.hub.CreateGroup("x", "neon"); err == nil {
+		t.Fatal("unknown colour accepted")
+	}
+	dockFP := strings.Repeat("A", 43)
+	agent := hub.Member{Kind: "pane", Dock: dockFP, Session: "default", Pane: "w1:p2"}
+	machine := hub.Member{Kind: "dock", Dock: dockFP}
+	if err := f.hub.MoveMember(agent, &physics.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.hub.MoveMember(machine, &physics.ID, ptr(0)); err != nil {
+		t.Fatal(err)
+	}
+	// moving the agent to Coding takes it out of Physics
+	if err := f.hub.MoveMember(agent, &coding.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	gs := f.hub.Groups()
+	if len(gs[0].Members) != 1 || gs[0].Members[0] != machine || len(gs[1].Members) != 1 || gs[1].Members[0] != agent {
+		t.Fatalf("groups = %+v", gs)
+	}
+	if err := f.hub.MoveMember(hub.Member{Kind: "pane", Dock: dockFP, Session: "default", Pane: "w1;rm"}, &coding.ID, nil); err == nil {
+		t.Fatal("bad pane id accepted")
+	}
+	if err := f.hub.ReorderGroups([]string{coding.ID, physics.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if gs := f.hub.Groups(); gs[0].ID != coding.ID {
+		t.Fatal("reorder ignored")
+	}
+	name := "Burst"
+	if _, err := f.hub.UpdateGroup(physics.ID, &name, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.hub.DeleteGroup(coding.ID); err != nil {
+		t.Fatal(err)
+	}
+	if gs := f.hub.Groups(); len(gs) != 1 || gs[0].Name != "Burst" {
+		t.Fatalf("after delete: %+v", gs)
+	}
+	// groups survive a hub restart
+	h2, err := hub.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gs := h2.Groups(); len(gs) != 1 || gs[0].Name != "Burst" || len(gs[0].Members) != 1 {
+		t.Fatalf("after reload: %+v", gs)
+	}
+}
+
+func ptr[T any](v T) *T { return &v }

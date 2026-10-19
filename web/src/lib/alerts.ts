@@ -1,9 +1,9 @@
 // Browser notifications when an agent turns blocked, anywhere in the fleet. Only
 // changes are announced: an agent already blocked when the page loads is in the
-// "Needs you" list, not in a notification. The page title carries the count too.
+// "Needs you" list, not in a notification. (App.vue owns the page title and its count.)
 
 import { reactive, watch } from "vue";
-import { blocked, openPane, panes, save } from "./store";
+import { openPane, panes, save } from "./store";
 import type { PaneInfo } from "./fleet";
 
 const supported = typeof window !== "undefined" && "Notification" in window;
@@ -72,13 +72,6 @@ export function watchAlerts() {
       }
       // An empty fleet (signed out, first load) is not a baseline to compare against.
       seen = list.length ? next : undefined;
-    },
-    { immediate: true },
-  );
-  watch(
-    () => blocked.value.length,
-    (n) => {
-      document.title = n ? `(${n}) Ember Fleet` : "Ember Fleet";
     },
     { immediate: true },
   );

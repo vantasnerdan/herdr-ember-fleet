@@ -7,6 +7,10 @@
 // on every change, the CSRF subprotocol on every socket, and the session epoch and
 // terminal ID on /api/term. Sign in at /signin#demo; /signin#used shows a used link.
 //
+// Groups (/api/groups…) and uploads (/api/upload) are mocked too: an upload's body is read
+// and dropped, and the answer is a made-up path under the agent user's
+// ~/.cache/ember-fleet/uploads/<date>/. A file name with "fail" in it fails, to try retry.
+//
 // Mock-only helpers, for trying failure paths:
 //   POST /api/mock/restart?dock=<id>&session=<name>   herdr restarts: new epoch, new terminal ids
 //   POST /api/mock/toggle?dock=<id>                   the dock goes offline / comes back
@@ -16,6 +20,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { randomBytes } from "node:crypto";
 import type { Plugin } from "vite";
+import type { Group, Member } from "../src/lib/types.ts";
 import { WebSocketServer, type WebSocket } from "ws";
 import {
   joinedMachine,
@@ -63,6 +68,31 @@ export function mockApi(): Plugin {
   const machines: SimMachine[] = makeFleet();
   const links: Link[] = [];
   const live = new Set<WebSocket>();
+  let fleetName = "Home fleet";
+  let groupSeq = 3;
+  let groups: Group[] = [
+    {
+      id: "g1",
+      name: "Coding",
+      color: "ember",
+      members: [
+        { kind: "pane", dock: "studio-agent-one", session: "default", pane: "w1:p1" },
+        { kind: "dock", dock: "laptop-sam" },
+      ],
+    },
+    {
+      id: "g2",
+      name: "Physics",
+      color: "sky",
+      members: [
+        { kind: "pane", dock: "studio-admin", session: "night-shift", pane: "w1:p1" },
+        { kind: "pane", dock: "studio-agent-two", session: "default", pane: "w2:p1" },
+        // a pane herdr has not restored (yet): shown as not running
+        { kind: "pane", dock: "studio-agent-one", session: "default", pane: "w3:p1" },
+      ],
+    },
+    { id: "g3", name: "Burst", color: "", members: [] },
+  ];
   const viewers = new Set<Viewer>();
   const controllers = new Map<SimPane, Viewer>();
 
@@ -230,7 +260,7 @@ export function mockApi(): Plugin {
 
     if (path === "/api/me" && method === "GET") {
       return json(res, 200, signedIn(req)
-        ? { signedIn: true, csrf: CSRF, fleet: "Home fleet", hub: "SHA256:k7Qe…9fXw", version: "0.1.0-mock" }
+        ? { signedIn: true, csrf: CSRF, fleet: fleetName, hub: "SHA256:k7Qe…9fXw", version: "0.1.0-mock" }
         : { signedIn: false, csrf: "", fleet: "", hub: "", version: "0.1.0-mock" });
     }
     if (path === "/api/signin" && method === "POST") {
@@ -304,6 +334,130 @@ export function mockApi(): Plugin {
         return json(res, 200, { ok: true });
       }
     }
+    if (path === "/api/fleet" && method === "POST") {
+      const name = String((await readBody(req)).name ?? "").trim();
+      if (!name || name.length > 40 || /[\u0000-\u001f\u007f]/.test(name))
+        return json(res, 400, { ok: false, error: "A fleet name is 1 to 40 characters, with no control characters" });
+      fleetName = name;
+      broadcast({ type: "fleet", name });
+      return json(res, 200, { ok: true, name });
+    }
+
+    // ---------------------------------------------------------------- groups
+    const sendGroups = () => broadcast({ type: "groups", groups });
+    const memberKey = (m: Member) => (m.kind === "dock" ? `d:${m.dock}` : `p:${m.dock}/${m.session}/${m.pane}`);
+    const validMember = (m: unknown): m is Member => {
+      const x = m as Partial<Member> & Record<string, unknown>;
+      if (!x || typeof x.dock !== "string" || !x.dock) return false;
+      if (x.kind === "dock") return true;
+      return x.kind === "pane" && typeof x.session === "string" && typeof x.pane === "string";
+    };
+    const nameError = (name: unknown) =>
+      typeof name !== "string" || !name.trim() || name.trim().length > 40 ? "A group name is 1 to 40 characters" : "";
+    const COLORS = ["", "ember", "amber", "rose", "teal", "sky", "violet", "slate"];
+
+    if (path === "/api/groups" && method === "GET") return json(res, 200, { groups });
+    if (path === "/api/groups" && method === "POST") {
+      const body = await readBody(req);
+      const err = nameError(body.name);
+      if (err) return json(res, 400, { ok: false, error: err });
+      const color = String(body.color ?? "");
+      if (!COLORS.includes(color)) return json(res, 400, { ok: false, error: "unknown colour" });
+      const group: Group = { id: `g${++groupSeq}`, name: String(body.name).trim(), color, members: [] };
+      groups = [...groups, group];
+      sendGroups();
+      return json(res, 200, { group });
+    }
+    if (path === "/api/groups/move" && method === "POST") {
+      const body = await readBody(req);
+      if (!validMember(body.member)) return json(res, 400, { ok: false, error: "bad member" });
+      const member: Member =
+        body.member.kind === "dock"
+          ? { kind: "dock", dock: body.member.dock }
+          : { kind: "pane", dock: body.member.dock, session: body.member.session, pane: body.member.pane };
+      const to = body.group === null ? null : String(body.group ?? "");
+      if (to !== null && !groups.some((g) => g.id === to)) return json(res, 404, { ok: false, error: "no such group" });
+      const key = memberKey(member);
+      groups = groups.map((g) => ({ ...g, members: g.members.filter((m) => memberKey(m) !== key) }));
+      if (to) {
+        const g = groups.find((x) => x.id === to)!;
+        const at = typeof body.index === "number" ? Math.max(0, Math.min(body.index, g.members.length)) : g.members.length;
+        g.members = [...g.members.slice(0, at), member, ...g.members.slice(at)];
+      }
+      sendGroups();
+      return json(res, 200, { groups });
+    }
+    if (path === "/api/groups/reorder" && method === "POST") {
+      const ids = (await readBody(req)).ids;
+      if (!Array.isArray(ids)) return json(res, 400, { ok: false, error: "ids must be a list" });
+      const byId = new Map(groups.map((g) => [g.id, g]));
+      const next = ids.map((id) => byId.get(String(id))).filter((g): g is Group => !!g);
+      for (const g of groups) if (!next.includes(g)) next.push(g);
+      groups = next;
+      sendGroups();
+      return json(res, 200, { groups });
+    }
+    const groupMatch = /^\/api\/groups\/([^/]+)$/.exec(path);
+    if (groupMatch) {
+      const id = decodeURIComponent(groupMatch[1]);
+      const g = groups.find((x) => x.id === id);
+      if (!g) return json(res, 404, { ok: false, error: "no such group" });
+      if (method === "PATCH") {
+        const body = await readBody(req);
+        if (body.name !== undefined) {
+          const err = nameError(body.name);
+          if (err) return json(res, 400, { ok: false, error: err });
+        }
+        if (body.color !== undefined && !COLORS.includes(String(body.color)))
+          return json(res, 400, { ok: false, error: "unknown colour" });
+        const group: Group = {
+          ...g,
+          ...(body.name !== undefined ? { name: String(body.name).trim() } : {}),
+          ...(body.color !== undefined ? { color: String(body.color) } : {}),
+        };
+        groups = groups.map((x) => (x.id === id ? group : x));
+        sendGroups();
+        return json(res, 200, { group });
+      }
+      if (method === "DELETE") {
+        groups = groups.filter((x) => x.id !== id);
+        sendGroups();
+        return json(res, 200, { ok: true });
+      }
+    }
+
+    // ---------------------------------------------------------------- uploads
+    if (path === "/api/upload" && method === "POST") {
+      const found = find(url.searchParams.get("dock") ?? "");
+      if (!found || !found.d.online) return json(res, 404, { ok: false, error: "that machine is offline" });
+      if (found.d.role === "viewer") return json(res, 403, { ok: false, error: "forbidden" });
+      let name = "file";
+      try {
+        name = decodeURIComponent(String(req.headers["x-ember-filename"] ?? "file")) || "file";
+      } catch {
+        // keep "file"
+      }
+      const LIMIT = 50 * 1024 * 1024;
+      let size = 0;
+      let over = false;
+      await new Promise<void>((done) => {
+        req.on("data", (c: Buffer) => {
+          size += c.length;
+          if (size > LIMIT) over = true;
+        });
+        req.on("end", () => done());
+        req.on("error", () => done());
+      });
+      if (over) return json(res, 413, { ok: false, error: "over the 50 MB limit" });
+      await later(500 + Math.min(2500, size / 4000));
+      if (/fail/i.test(name)) return json(res, 500, { ok: false, error: "disk full (mock)" });
+      const safe = name.replace(/[^\w.@+-]+/g, "-").slice(-80) || "file";
+      const day = new Date().toISOString().slice(0, 10);
+      const home = found.d.os === "darwin" ? `/Users/${found.d.user}` : `/home/${found.d.user}`;
+      const path = `${home}/.cache/ember-fleet/uploads/${day}/${randomBytes(3).toString("hex")}-${safe}`;
+      return json(res, 200, { ok: true, path, name, size });
+    }
+
     if (path === "/api/tokens" && method === "POST") {
       await readBody(req);
       return json(res, 200, { token: `eft_${randomBytes(24).toString("base64url")}` });
@@ -457,7 +611,7 @@ export function mockApi(): Plugin {
       if (url.pathname === "/api/live") {
         live.add(ws);
         ws.on("close", () => live.delete(ws));
-        ws.send(JSON.stringify({ type: "hello", fleet: { machines: machines.map(machineOut) } }));
+        ws.send(JSON.stringify({ type: "hello", fleet: { machines: machines.map(machineOut) }, groups }));
       } else openTerm(ws, url);
     });
   }

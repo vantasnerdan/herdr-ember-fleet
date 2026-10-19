@@ -59,11 +59,13 @@ type State struct {
 	Fleet      string                     `json:"fleet"`
 	Relay      string                     `json:"relay"`
 	Pin        string                     `json:"pin"`
+	URL        string                     `json:"url,omitempty"` // public URL behind a proxy (set-url)
 	Links      map[string]*Link           `json:"links"`
 	Docks      map[string]*DockRec        `json:"docks"`
 	Tombstones map[string]int64           `json:"tombstones"` // removed docks, ignored forever
 	Tokens     map[string]*Token          `json:"tokens"`
 	Sessions   map[string]*BrowserSession `json:"sessions"`
+	Groups     []*Group                   `json:"groups"`
 }
 
 // Store serializes every change to hub.json: one lock, one atomic write.

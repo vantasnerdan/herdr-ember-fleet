@@ -70,6 +70,7 @@ func (d *Dock) grant(fp string) (HubGrant, bool) {
 // Run serves until ctx ends, reconnecting to the relay as needed.
 func (d *Dock) Run(ctx context.Context) error {
 	go d.sessions.Run(ctx)
+	go cleanUploads(ctx)
 	log.Printf("dock %s for %s, relay %s", keys.Short(d.id.Fingerprint), d.cfg.Name, d.cfg.Relay)
 	var b relay.Backoff
 	for ctx.Err() == nil {
@@ -161,6 +162,10 @@ func (d *Dock) channel(ctx context.Context, client pb.RelayClient, id string) {
 	case e2e.KindEndpoint:
 		if ch.need(PermAttach) {
 			d.endpoint(ctx, ch)
+		}
+	case e2e.KindUpload:
+		if ch.need(PermControl) { // putting files on this machine is as strong as typing
+			d.upload(ctx, ch)
 		}
 	default:
 		ch.fail("unknown_kind", "unknown channel kind")

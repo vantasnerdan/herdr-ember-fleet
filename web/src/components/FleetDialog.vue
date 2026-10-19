@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Fleet settings: machines and their users, join links waiting to be used, terminal
 // access tokens, this hub, and signing out. "Add a machine" is a view of its own.
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Check, Copy, KeyRound, Link2, LogOut, Pencil, Plus, Server, Trash2, X } from "@lucide/vue";
 import Modal from "./Modal.vue";
 import AddMachine from "./AddMachine.vue";
@@ -17,6 +17,29 @@ const tokenName = ref("");
 const token = ref("");
 const copied = ref("");
 const busy = ref(false);
+const fleetName = ref(app.me?.fleet ?? "");
+const nameBusy = ref(false);
+const nameError = ref("");
+const savedName = ref("");
+const nameChanged = computed(() => fleetName.value.trim() !== (app.me?.fleet ?? ""));
+watch(() => app.me?.fleet, (name, before) => {
+  if (fleetName.value.trim() === before) fleetName.value = name ?? "";
+});
+async function renameFleet() {
+  const name = fleetName.value.trim();
+  if (!name || !nameChanged.value || nameBusy.value) return;
+  nameBusy.value = true;
+  nameError.value = savedName.value = "";
+  try {
+    await api.renameFleet(name);
+    fleetName.value = app.me?.fleet ?? name;
+    savedName.value = "Fleet name saved.";
+  } catch (e) {
+    nameError.value = errorText(e);
+  } finally {
+    nameBusy.value = false;
+  }
+}
 let poll: ReturnType<typeof setInterval> | undefined;
 
 const adding = computed(() => app.settings === "add");
@@ -136,8 +159,8 @@ const loginCommand = computed(() => `ember-fleet login ${location.origin}`);
 
 <template>
   <Modal
-    :eyebrow="adding ? 'Join a machine to the fleet' : 'Fleet settings'"
-    :title="adding ? 'Add a machine' : (app.me?.fleet ?? 'Fleet')"
+    :eyebrow="adding ? 'Expand your workspace' : 'Your workspace'"
+    :title="adding ? 'Add a machine' : 'Settings'"
     wide
     @close="close"
   >
@@ -145,6 +168,19 @@ const loginCommand = computed(() => `ember-fleet login ${location.origin}`);
 
     <template v-else>
       <section class="fleet-section first">
+        <form class="fleet-name-form" @submit.prevent="renameFleet">
+          <label for="fleet-name">Fleet name</label>
+          <p id="fleet-name-help" class="hint">The name at the top of your workspace. Shared with everyone connected to this hub.</p>
+          <div class="inline-form">
+            <input id="fleet-name" v-model="fleetName" name="fleet-name" maxlength="40" required :disabled="nameBusy" autocomplete="off" aria-describedby="fleet-name-help" :aria-invalid="!!nameError" @input="savedName = ''; nameError = ''" />
+            <button class="primary small" :disabled="nameBusy || !fleetName.trim() || !nameChanged">{{ nameBusy ? 'Saving…' : 'Save name' }}</button>
+          </div>
+          <p v-if="nameError" class="message-error" role="alert">{{ nameError }}</p>
+          <p v-else-if="savedName" class="saved-note" role="status"><Check :size="14" />{{ savedName }}</p>
+        </form>
+      </section>
+
+      <section class="fleet-section">
         <h3><Server :size="16" />Machines</h3>
         <ul v-if="rows.length" class="item-list">
           <li v-for="{ host, d } in rows" :key="d.id" :class="{ offline: !d.online }">
@@ -229,16 +265,13 @@ const loginCommand = computed(() => `ember-fleet login ${location.origin}`);
       </section>
 
       <section class="fleet-section">
-        <h3>This hub</h3>
+        <h3>About</h3>
+        <p class="about-product">Herdr Ember Fleet <span class="badge">{{ app.me?.version }}</span></p>
         <dl class="facts">
-          <dt>Fleet</dt>
-          <dd>{{ app.me?.fleet }}</dd>
           <dt>Hub key</dt>
           <dd><code>{{ app.me?.hub }}</code></dd>
           <dt>Address</dt>
           <dd>{{ loginCommand.split(" ").at(-1) }}</dd>
-          <dt>Version</dt>
-          <dd>{{ app.me?.version }}</dd>
         </dl>
       </section>
 

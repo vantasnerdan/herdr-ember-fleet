@@ -77,13 +77,24 @@ curl -fsSL https://<your hub>/install.sh | sh      # asks for the link
 
 That installs `ember-fleet`, joins, and starts the dock as a user service: systemd with lingering on Linux, a launchd agent on macOS. A link works once and expires in 24 hours. Several OS users on one computer each run their own dock. Give their links the same machine name and they show up together.
 
-**5. Optional: move the page to the server**, so a phone can reach it:
+**5. Optional: move the page to the server**, so a phone can reach it. There are two ways.
+
+Behind your own TLS proxy (Pangolin, Caddy, nginx), with the hub on a local port:
 
 ```sh
-scripts/move-hub.sh me@relay.example.com fleet.example.com
+scripts/move-hub.sh me@relay.example.com --url https://fleet.example.com
+# later, if the address changes: ssh me@relay.example.com ember-fleet hub set-url https://new.example.com
 ```
 
-This serves `https://fleet.example.com` with a Let's Encrypt certificate (ports 80 and 443). The hub's key and records move with it, so no machine pairs again.
+If the proxy adds its own sign-in (Pangolin SSO, for example), let `/install.sh` and `/dl/*` through without it, so new machines can install. Do the same for `/api/*` if you use `ember-fleet attach` or `term` from other computers. The hub still checks its own sign-in, tokens and join links on all of them.
+
+Or the hub serves HTTPS itself, with a Let's Encrypt certificate on ports 80 and 443:
+
+```sh
+scripts/move-hub.sh me@relay.example.com --public fleet.example.com
+```
+
+Either way, the hub's key and records move with it, so no machine pairs again.
 
 ## Everyday use
 

@@ -1,0 +1,373 @@
+/* Groups in the sidebar: sections, group headers, tags on grouped rows, drag-and-drop
+   targets, the row menu and the group dialog. Built on the Ember tokens in ember.css. */
+
+/* ---------------------------------------------------------------- filter + view toggle */
+.tree-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 12px 10px;
+}
+.tree-tools .tree-filter {
+  flex: 1 1 100%;
+  margin: 0;
+  min-width: 0;
+}
+.view-toggle {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 18px;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--line);
+}
+.view-toggle button {
+  position: relative;
+  padding: 5px 0 9px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.view-toggle button[aria-pressed="true"] { color: var(--ember-bright); }
+.view-toggle button[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* ---------------------------------------------------------------- sections */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 6px 5px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.machines-section {
+  margin-top: 6px;
+  border-radius: 8px;
+}
+.machines-section.drop-ungroup {
+  box-shadow: inset 0 0 0 1px rgb(244 120 83 / 0.55);
+  background: rgb(244 120 83 / 0.04);
+}
+.section-add {
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px dashed transparent;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
+}
+.section-add:hover,
+.section-add.drop {
+  border-color: rgb(244 120 83 / 0.6);
+  background: rgb(244 120 83 / 0.08);
+}
+.groups-hint {
+  margin: 2px 10px 8px;
+  font-size: 12.5px;
+}
+
+/* ---------------------------------------------------------------- group header */
+.tree-row.group-row {
+  min-height: 50px;
+  margin: 8px 0 4px;
+  padding: 8px 8px 8px 4px;
+  border: 1px solid var(--line);
+  border-top-color: var(--ember-line-high);
+  border-radius: 6px;
+  background: rgb(17 24 41 / 0.55);
+}
+.tree-row.group-row.has-color {
+  background: linear-gradient(100deg, color-mix(in srgb, var(--group) 5%, transparent), transparent 75%), rgb(11 17 32 / 0.5);
+}
+.tree-row.group-row .name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ember-bright);
+  cursor: text;
+}
+.tree-row.group-row .meta {
+  font-size: 11px;
+}
+.group-name-input {
+  width: 100%;
+  padding: 3px 7px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 3px;
+  background: var(--group, transparent);
+}
+.swatch.none {
+  background: transparent;
+  border: 1px solid var(--ember-dim);
+}
+
+/* a grouped row in the machine tree wears its group's name */
+.group-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  max-width: 120px;
+  padding: 0 6px 0 5px;
+  border: 1px solid var(--ember-line-high);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 400;
+  color: var(--ember-text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.group-tag::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--group, transparent);
+  box-shadow: inset 0 0 0 1px var(--group, var(--ember-dim));
+}
+.tree-row .two > span > .name + .group-tag,
+.tree-row .two > span > .badge + .group-tag {
+  margin-left: 2px;
+}
+
+/* rows inside a group: where they live, and members that are not running */
+.tree-row .sub .where {
+  color: var(--ember-text);
+}
+.tree-row.missing {
+  opacity: 1;
+  min-height: 46px;
+  margin: 3px 0;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+}
+.tree-row.missing .name {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tree-row.missing .sub {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the "⋯" menu: on hover or focus with a mouse, always on touch */
+.tree-row .row-more {
+  display: inline-flex;
+  visibility: hidden;
+  pointer-events: none;
+  width: 26px;
+  height: 26px;
+}
+.tree-row:hover .row-more,
+.tree-row.focus .row-more,
+.tree-row .row-more:focus-visible {
+  visibility: visible;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .tree-row .row-more {
+    visibility: visible;
+    pointer-events: auto;
+  }
+}
+.tree-row .row-remove {
+  width: 26px;
+  height: 26px;
+}
+
+/* ---------------------------------------------------------------- drag and drop */
+.tree-row.movable {
+  cursor: pointer;
+}
+.tree-row.movable:active {
+  cursor: grabbing;
+}
+.tree-row.dragging {
+  opacity: 0.4;
+}
+.tree-row.drop-into {
+  background: rgb(244 120 83 / 0.1);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  box-shadow:
+    inset 0 0 0 1px rgb(244 120 83 / 0.7),
+    0 0 12px rgb(244 120 83 / 0.18);
+}
+.tree-row.drop-before::after,
+.tree-row.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.tree-row.drop-before::after { top: 0; bottom: auto; }
+.tree-row.drop-after::after { top: auto; bottom: 0; }
+.group-empty,
+.ungroup-zone {
+  margin: 2px 6px 6px 28px;
+  padding: 12px;
+  border: 1px dashed var(--ember-line-high);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.7;
+  background: rgb(3 6 14 / 0.25);
+  color: var(--muted);
+}
+.ungroup-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 6px 2px;
+  color: var(--muted);
+}
+.group-empty.drop,
+.ungroup-zone.drop {
+  border-color: rgb(244 120 83 / 0.7);
+  border-style: solid;
+  background: rgb(244 120 83 / 0.08);
+  color: var(--ember-text);
+}
+
+/* ---------------------------------------------------------------- the row menu */
+.row-menu-pop {
+  position: fixed;
+  z-index: 85;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(70dvh, 520px);
+  overflow: auto;
+  padding: 6px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #162035, #0e1525);
+  border: 1px solid #344465;
+  border-top-color: #46516b;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.5);
+  display: flex;
+  flex-direction: column;
+}
+.row-menu-title {
+  padding: 8px 10px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.row-menu-pop button {
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: left;
+}
+.row-menu-pop button:not(:disabled):hover,
+.row-menu-pop button:focus-visible {
+  background: rgb(244 120 83 / 0.08);
+  outline: 1px solid rgb(244 120 83 / 0.35);
+  outline-offset: -1px;
+}
+.row-menu-pop button.danger {
+  color: var(--ember-red);
+}
+.row-menu-pop button .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.row-menu-pop button .tick {
+  color: var(--accent);
+}
+.row-menu-pop hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 2px;
+}
+
+/* ---------------------------------------------------------------- the group dialog */
+.group-form .swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+.group-form .swatches legend {
+  margin-bottom: 8px;
+  font-size: 13.5px;
+}
+.group-form .swatch-pick {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.group-form .swatch-pick.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.group-form .swatch-pick:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.group-form .swatch-pick .swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+.group-form .swatch-pick input,
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  opacity: 0;
+}
+
+@media (max-width: 700px) {
+  .row-menu-pop button { min-height: 44px; }
+  .tree-row .row-more, .tree-row .row-remove { width: 32px; height: 32px; }
+  .group-form .swatch-pick { width: 40px; height: 40px; }
+}

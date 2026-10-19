@@ -2,8 +2,13 @@
 // The live terminal of one pane. Opens watching; control only ever starts from a click
 // (PaneView). When herdr restarts under it, the hub says "stale": the view takes the
 // fresh snapshot and watches the pane with the same id, or says it is gone.
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+//
+// In control, pasting (or dropping) a file or an image uploads it to the agent's machine
+// and types its path at the cursor. Plain text pastes as usual.
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from "vue";
 import { CircleOff, Unplug } from "@lucide/vue";
+import AttachChips from "./AttachChips.vue";
+import { dropAttachment, filesOf, newAttachment, quotePath, startUpload, type Attachment } from "../lib/attach";
 import { fontsReady, TermView, type TermState, type TermTarget } from "../lib/term";
 import { ago, type PaneInfo } from "../lib/fleet";
 import { confirmAsk, notify, now, paneIndex, refreshFleet } from "../lib/store";
@@ -137,11 +142,61 @@ function clickHost() {
   if (state.value?.mode === "control") view.value?.focus();
 }
 
+// ---------------------------------------------------------------- files, in control
+
+const uploads = reactive<Attachment[]>([]);
+const controlling = () => state.value?.mode === "control" && state.value.phase === "open";
+
+function forget(a: Attachment, after = 0) {
+  setTimeout(() => {
+    const i = uploads.indexOf(a);
+    if (i >= 0) uploads.splice(i, 1);
+    dropAttachment(a);
+  }, after);
+}
+
+/** Uploads one file and types its path where the cursor is, if this view is still in control. */
+async function place(a: Attachment, first: boolean) {
+  const target = { dock: props.pane.dock.id, session: props.pane.session.name, pane: props.pane.ref.pane };
+  if (!(await startUpload(a, target)) || !a.path) return;
+  const typed = view.value?.typeInput(`${first ? "" : " "}${quotePath(a.path)}`);
+  if (!typed) notify(`${a.name} is on ${props.pane.host} at ${a.path}, but control ended before it could be typed.`, "warn", 12000);
+  forget(a, 1500);
+}
+
+/** In control: upload files (in order) and type their paths at the cursor. */
+async function uploadAndType(files: File[]) {
+  if (!controlling() || !files.length) return false;
+  const batch = files.map((f) => {
+    const a = newAttachment(f);
+    uploads.push(a);
+    return a;
+  });
+  let first = true;
+  for (const a of batch) {
+    await place(a, first);
+    first = false;
+  }
+  return true;
+}
+
+function onPaste(e: ClipboardEvent) {
+  if (!controlling()) return;
+  const files = filesOf(e.clipboardData);
+  if (!files.length) return; // text goes to xterm, which pastes it
+  e.preventDefault();
+  e.stopPropagation();
+  void uploadAndType(files);
+}
+
+onBeforeUnmount(() => uploads.forEach(dropAttachment));
+
 defineExpose({
   takeControl: (takeover = false) => view.value?.takeControl(takeover),
   release: () => view.value?.release(),
   fit: () => view.value?.fitToWindow(),
   dismiss: () => view.value?.dismissNotices(),
+  uploadAndType,
 });
 </script>
 
@@ -152,6 +207,14 @@ defineExpose({
       class="term-host"
       :class="{ control: state?.mode === 'control' && state.phase === 'open' }"
       @click="clickHost"
+      @paste.capture="onPaste"
+    />
+    <AttachChips
+      v-if="uploads.length"
+      class="term-uploads"
+      :items="uploads"
+      @retry="(a) => place(a, false)"
+      @remove="(a) => forget(a)"
     />
     <div v-if="gone || vanished" class="term-overlay">
       <CircleOff :size="26" />

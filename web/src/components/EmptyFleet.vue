@@ -7,15 +7,15 @@ import AddMachine from "./AddMachine.vue";
   <div class="empty-fleet">
     <div class="empty-card">
       <img class="gate-mark" src="/mark.svg" alt="" />
-      <span class="eyebrow">An empty fleet</span>
-      <h1>Add your first machine</h1>
+      <span class="eyebrow">Make yourself at home</span>
+      <h1>Your fleet starts here<span class="coral">.</span></h1>
+      <p class="hint">Bring your machines together. Keep every agent in view.</p>
       <ol class="steps">
-        <li><b>Name it.</b> The page makes a one-time join link for it.</li>
+        <li><b>Name a machine.</b> Create a one-time join link.</li>
         <li>
-          <b>Run one command on it</b>, as the OS user whose herdr you want here. It dials out to the relay, so the
-          computer needs no SSH and no open port.
+          <b>Connect it.</b> Run the join command as the user whose herdr you want to see.
         </li>
-        <li><b>Watch it arrive.</b> Every agent in its herdr shows up in the tree, with its state, live.</li>
+        <li><b>Open an agent.</b> Watch its screen, send a prompt, or take control.</li>
       </ol>
       <AddMachine inline />
     </div>

@@ -13,9 +13,9 @@ const view = computed(() => {
     case "unreachable":
       return { eyebrow: "Hub", title: "Can’t reach the hub", busy: false };
     case "signed-out":
-      return { eyebrow: "Ember Fleet", title: "You are signed out", busy: false };
+      return { eyebrow: "Herdr Ember Fleet", title: "Your workspace awaits.", busy: false };
     default:
-      return { eyebrow: "Ember Fleet", title: "Connecting to the hub…", busy: true };
+      return { eyebrow: "Herdr Ember Fleet", title: "Opening your workspace…", busy: true };
   }
 });
 
@@ -29,15 +29,16 @@ function retry() {
 <template>
   <main class="gate">
     <div class="gate-card">
-      <img class="gate-mark" src="/mark.svg" alt="Ember Fleet" />
+      <img class="gate-mark" src="/mark.svg" alt="" />
       <span class="eyebrow">{{ view.eyebrow }}</span>
       <h1>
         <LoaderCircle v-if="view.busy" :size="20" class="spin" />{{ view.title }}
       </h1>
       <template v-if="app.phase === 'signed-out'">
-        <p>Run this on the hub to get a sign-in link, then open it in this browser:</p>
+        <p>Every agent. Every machine. One place to work.</p>
+        <p class="hint">On the hub, get a sign-in link and open it here:</p>
         <code class="gate-cmd">ember-fleet login-link</code>
-        <p class="hint">Each link works once.</p>
+        <p class="hint gate-note">A private workspace. A one-time sign-in link.</p>
       </template>
       <template v-else-if="app.phase === 'signin-failed'">
         <p class="message-error" role="alert">{{ app.signinError }}</p>

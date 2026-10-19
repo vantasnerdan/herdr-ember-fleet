@@ -1,13 +1,28 @@
 <script setup lang="ts">
 // One row of the fleet tree: a machine, an OS user's dock, a herdr session, a
-// workspace, a tab, or a pane with its agent.
+// workspace, a tab, or a pane with its agent; inside a group, also a member that is
+// not running any more. Agents and machine users can be dragged into groups; the "⋯"
+// button (or a right-click) offers the same as a menu.
 import { computed } from "vue";
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Layers, PanelTop, UserRound } from "@lucide/vue";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleOff,
+  Ellipsis,
+  Folder,
+  FolderOpen,
+  Layers,
+  PanelTop,
+  UserRound,
+  X,
+} from "@lucide/vue";
 import DeviceIcon from "./DeviceIcon.vue";
 import HarnessIcon from "./HarnessIcon.vue";
 import StatePill from "./StatePill.vue";
 import { ago, plural, shortPath, type TreeNode } from "../lib/fleet";
+import { colorHex } from "../lib/groups";
 import { now } from "../lib/store";
+import type { Group } from "../lib/types";
 
 const props = defineProps<{
   node: TreeNode;
@@ -15,14 +30,21 @@ const props = defineProps<{
   open: boolean;
   selected: boolean;
   focused: boolean;
+  /** It can be dragged into a group (and has a "Move to group…" menu). */
+  movable?: boolean;
+  /** The group it is in, shown as a tag in the machine tree. */
+  tag?: Group;
+  drop?: "into" | "before" | "after";
+  dragging?: boolean;
 }>();
-const emit = defineEmits<{ toggle: []; activate: [] }>();
+const emit = defineEmits<{ toggle: []; activate: []; menu: [anchor: DOMRect]; remove: [] }>();
 
 const n = computed(() => props.node);
 const hasChildren = computed(() => n.value.children.length > 0);
 const pane = computed(() => n.value.pane);
 /** Rolled-up states glow only while their rows are folded away. */
 const folded = computed(() => hasChildren.value && !props.open);
+const tagHex = computed(() => colorHex(props.tag?.color));
 
 const dockMeta = computed(() => {
   const d = n.value.dock;
@@ -54,16 +76,37 @@ const title = computed(() => {
   const node = n.value;
   if (node.kind === "pane" && node.pane) {
     const p = node.pane;
-    return [p.name + (p.harness ? ` (${p.harness}, ${p.status})` : " (shell)"), p.title, p.cwd, p.ref.pane]
+    return [
+      p.name + (p.harness ? ` (${p.harness}, ${p.status})` : " (shell)"),
+      `${p.dock.user}@${p.host}`,
+      p.title,
+      p.cwd,
+      p.ref.pane,
+      props.tag ? `In group ${props.tag.name}` : "",
+    ]
       .filter(Boolean)
       .join("\n");
   }
   if (node.kind === "machine" || node.kind === "dock") {
     const d = node.only ?? (node.kind === "dock" ? node.dock : undefined);
-    if (d) return [`${node.host} · ${d.user}`, d.name !== node.host ? d.name : "", `${d.os}/${d.arch} · role ${d.role}`, node.error ?? ""].filter(Boolean).join("\n");
+    if (d)
+      return [
+        `${node.host} · ${d.user}`,
+        d.name !== node.host ? d.name : "",
+        `${d.os}/${d.arch} · role ${d.role}`,
+        node.error ?? "",
+        props.tag ? `In group ${props.tag.name}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
   }
+  if (node.kind === "missing") return `${node.label}\n${node.context}\nIt comes back here when it runs again.`;
   return node.error ? `${node.label}\n${node.error}` : node.label;
 });
+
+function openMenu(e: MouseEvent) {
+  emit("menu", (e.currentTarget as HTMLElement).getBoundingClientRect());
+}
 </script>
 
 <template>
@@ -71,7 +114,16 @@ const title = computed(() => {
     class="tree-row"
     :class="[
       n.kind,
-      { sel: selected, focus: focused, offline: !n.online, shell: n.kind === 'pane' && !pane?.harness },
+      drop ? `drop-${drop}` : '',
+      {
+        sel: selected,
+        focus: focused,
+        offline: !n.online,
+        shell: n.kind === 'pane' && !pane?.harness,
+        movable,
+        dragging,
+        grouped: !!n.inGroup,
+      },
     ]"
     :style="{ '--depth': depth }"
     role="treeitem"
@@ -80,7 +132,9 @@ const title = computed(() => {
     :aria-selected="selected"
     :data-key="n.key"
     :title="title"
+    :draggable="movable ? 'true' : undefined"
     @click="emit('activate')"
+    @contextmenu="movable ? ($event.preventDefault(), emit('menu', ($event.currentTarget as HTMLElement).getBoundingClientRect())) : undefined"
   >
     <button
       v-if="hasChildren"
@@ -100,19 +154,21 @@ const title = computed(() => {
         <span
           ><b class="name">{{ n.label }}</b
           ><span v-if="n.only" class="badge" :title="`OS user ${n.only.user}`">{{ n.only.user }}</span
-          ><span v-if="n.only && n.only.role !== 'owner'" class="badge">{{ n.only.role }}</span></span
+          ><span v-if="n.only && n.only.role !== 'owner'" class="badge">{{ n.only.role }}</span
+          ><span v-if="tag" class="group-tag" :style="tagHex ? { '--group': tagHex } : undefined">{{ tag.name }}</span></span
         >
         <span class="meta" :class="{ err: n.online && !!n.error }">{{ machineMeta }}</span>
       </span>
     </template>
 
-    <!-- dock: one OS user's herdr on a machine with several -->
+    <!-- dock: one OS user's herdr on a machine with several (or, in a group, user@host) -->
     <template v-else-if="n.kind === 'dock' && n.dock">
       <span class="mark"><UserRound :size="17" /><i class="dot" :class="dot" /></span>
       <span class="two">
         <span
           ><b class="name">{{ n.label }}</b
-          ><span v-if="n.dock.role !== 'owner'" class="badge">{{ n.dock.role }}</span></span
+          ><span v-if="n.dock.role !== 'owner'" class="badge">{{ n.dock.role }}</span
+          ><span v-if="tag" class="group-tag" :style="tagHex ? { '--group': tagHex } : undefined">{{ tag.name }}</span></span
         >
         <span class="meta" :class="{ err: n.online && !!n.error }">{{ dockMeta }}</span>
       </span>
@@ -136,14 +192,28 @@ const title = computed(() => {
       <span class="name">{{ n.label }}</span>
     </template>
 
+    <!-- a member whose pane or dock is gone; it stays, since herdr restores pane IDs -->
+    <template v-else-if="n.kind === 'missing'">
+      <CircleOff class="ico" :size="16" />
+      <span class="two">
+        <span><span class="name">{{ n.label }}</span></span>
+        <span class="sub">{{ n.context }}</span>
+      </span>
+    </template>
+
     <template v-else-if="pane">
       <HarnessIcon :harness="pane.harness" />
       <span class="two">
-        <span><span class="name">{{ pane.name }}</span></span>
+        <span
+          ><span class="name">{{ pane.name }}</span
+          ><span v-if="tag" class="group-tag" :style="tagHex ? { '--group': tagHex } : undefined">{{ tag.name }}</span></span
+        >
         <span class="sub"
+          ><span v-if="n.context" class="where">{{ n.context }}</span
+          ><template v-if="n.context && (pane.title || pane.cwd)"> · </template
           >{{ pane.title || (pane.harness ? "" : "shell")
-          }}<template v-if="pane.title && pane.cwd"> · </template
-          ><span v-if="pane.cwd" class="cwd">{{ shortPath(pane.cwd) }}</span></span
+          }}<template v-if="pane.title && pane.cwd && !n.context"> · </template
+          ><span v-if="pane.cwd && !n.context" class="cwd">{{ shortPath(pane.cwd) }}</span></span
         >
       </span>
     </template>
@@ -160,12 +230,31 @@ const title = computed(() => {
           ><i class="sdot working" :class="{ beacon: folded }" />{{ n.counts.working }}</span
         >
       </template>
+      <button
+        v-else-if="n.kind === 'missing'"
+        class="icon-button row-remove"
+        :aria-label="`Remove ${n.label} from ${n.inGroup?.name ?? 'the group'}`"
+        title="Remove from the group"
+        @click.stop="emit('remove')"
+      >
+        <X :size="15" />
+      </button>
       <i
         v-else-if="n.status && n.online"
         class="sdot"
         :class="[n.status, { beacon: folded && (n.status === 'working' || n.status === 'blocked') }]"
         :title="n.status"
       />
+      <button
+        v-if="movable"
+        class="icon-button row-more"
+        tabindex="-1"
+        :aria-label="`Move ${n.label} to a group`"
+        title="Move to group…"
+        @click.stop="openMenu"
+      >
+        <Ellipsis :size="16" />
+      </button>
     </span>
   </div>
 </template>

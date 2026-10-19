@@ -9,6 +9,8 @@
 import type {
   AgentStatus,
   Dock,
+  Group,
+  Member,
   HerdrPane,
   HerdrSnapshot,
   HerdrTab,
@@ -205,7 +207,7 @@ export function allPanes(machines: readonly Machine[]): PaneInfo[] {
 
 // ---------------------------------------------------------------- the tree
 
-export type NodeKind = "machine" | "dock" | "session" | "workspace" | "tab" | "pane";
+export type NodeKind = "machine" | "dock" | "session" | "workspace" | "tab" | "pane" | "group" | "missing";
 
 export interface Counts {
   agents: number;
@@ -240,6 +242,15 @@ export interface TreeNode {
   pane?: PaneInfo;
   /** Why a session can't be read: herdr not running, and so on. */
   error?: string;
+  /** A group's header row. */
+  group?: Group;
+  /** The group member this row stands for (top-level rows inside a group). */
+  member?: Member;
+  /** Rows inside a group's body: which group, and the index of the member they belong to. */
+  inGroup?: Group;
+  memberIndex?: number;
+  /** Where a row inside a group lives, since the machine tree above it isn't there: user@host. */
+  context?: string;
 }
 
 const zero = (): Counts => ({ agents: 0, working: 0, blocked: 0, done: 0, idle: 0, shells: 0 });
@@ -251,7 +262,7 @@ function sum(children: TreeNode[]): Counts {
   return c;
 }
 
-function container(
+export function container(
   base: Omit<TreeNode, "counts" | "status" | "text"> & { text?: string },
 ): TreeNode {
   const counts = sum(base.children);
@@ -259,7 +270,7 @@ function container(
   return { ...base, text: base.text ?? base.label, counts, status: rollup(states) };
 }
 
-function paneNode(info: PaneInfo): TreeNode {
+export function paneNode(info: PaneInfo): TreeNode {
   const counts = zero();
   if (info.harness) {
     counts.agents = 1;
@@ -364,6 +375,23 @@ function dockContents(host: string, dock: Dock): { children: TreeNode[]; onlySes
       }),
     ),
   };
+}
+
+/** One machine user as a row of its own, labelled user@host (for groups). */
+export function dockNode(host: string, dock: Dock): TreeNode {
+  const { children, onlySession, error } = dockContents(host, dock);
+  return container({
+    key: `d:${encodeURIComponent(dock.id)}`,
+    kind: "dock",
+    label: `${dock.user}@${host}`,
+    children,
+    online: dock.online,
+    text: `${dock.user} ${host} ${dock.name}`,
+    host,
+    dock,
+    onlySession,
+    error,
+  });
 }
 
 export function buildTree(machines: readonly Machine[]): TreeNode[] {

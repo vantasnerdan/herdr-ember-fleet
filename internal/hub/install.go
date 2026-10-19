@@ -46,7 +46,7 @@ func (w *Web) download(rw http.ResponseWriter, r *http.Request) {
 func (w *Web) installScript(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	rw.Header().Set("Cache-Control", "no-cache")
-	rw.Write([]byte(strings.ReplaceAll(installSh, "@HUB@", w.base)))
+	rw.Write([]byte(strings.ReplaceAll(installSh, "@HUB@", w.Base())))
 }
 
 const installSh = `#!/bin/sh

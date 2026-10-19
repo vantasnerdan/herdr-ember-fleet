@@ -102,8 +102,35 @@ func TestLiveFeedNeverDropsAChange(t *testing.T) {
 		sub.mark("busy")
 	}
 	sub.mark("quiet") // another machine changes once
-	dirty, _ := sub.take()
-	if !dirty["quiet"] || !dirty["busy"] {
-		t.Fatalf("lost a change: %v", dirty)
+	c := sub.take()
+	if !c.dirty["quiet"] || !c.dirty["busy"] {
+		t.Fatalf("lost a change: %v", c.dirty)
+	}
+}
+
+func TestSetURLSwitchesAllowedNames(t *testing.T) {
+	w, err := NewWeb(testHub(t), "127.0.0.1:4790", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := w.cfg.Load()
+	if !c.hosts["127.0.0.1:4790"] || !c.hosts["localhost:4790"] || w.Base() != "http://127.0.0.1:4790" {
+		t.Fatalf("loopback config: %+v", c)
+	}
+	if err := w.setURL("https://fleet.example.com/"); err != nil {
+		t.Fatal(err)
+	}
+	c = w.cfg.Load()
+	if !c.hosts["fleet.example.com"] || !c.origins["https://fleet.example.com"] || !c.hosts["127.0.0.1:4790"] || w.Base() != "https://fleet.example.com" {
+		t.Fatalf("proxied config: %+v base %s", c, w.Base())
+	}
+	if err := w.setURL("https://other.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if c = w.cfg.Load(); c.hosts["fleet.example.com"] || c.origins["https://fleet.example.com"] {
+		t.Fatal("old URL still allowed after a change")
+	}
+	if err := w.setURL("https://evil.example.com/path"); err == nil {
+		t.Fatal("URL with a path accepted")
 	}
 }

@@ -118,9 +118,44 @@ export interface HerdrSnapshot {
 // ---------------------------------------------------------------- live updates
 
 export type LiveMessage =
-  | { type: "hello"; fleet: { machines: Machine[] } }
+  | { type: "hello"; fleet: { machines: Machine[] }; groups?: Group[] }
   | { type: "machine"; machine: Machine }
-  | { type: "removed"; host?: string; id?: string };
+  | { type: "removed"; host?: string; id?: string }
+  | { type: "groups"; groups: Group[] }
+  | { type: "fleet"; name: string };
+
+// ---------------------------------------------------------------- groups
+
+/** The swatches a group may wear; "" is none. */
+export type GroupColor = "" | "ember" | "amber" | "rose" | "teal" | "sky" | "violet" | "slate";
+
+/** A whole machine user (dock) or a single agent (pane). Each is in at most one group. */
+export type Member =
+  | { kind: "dock"; dock: string }
+  | { kind: "pane"; dock: string; session: string; pane: string };
+
+export interface Group {
+  id: string;
+  name: string;
+  /** "" or a GroupColor; anything else a newer hub sends is shown without a swatch */
+  color: string;
+  members: Member[];
+}
+
+// ---------------------------------------------------------------- uploads
+
+export interface UploadTarget {
+  dock: string;
+  session: string;
+  pane: string;
+}
+
+export interface Uploaded {
+  /** Absolute path on the agent's machine. */
+  path: string;
+  name: string;
+  size: number;
+}
 
 // ---------------------------------------------------------------- terminals
 

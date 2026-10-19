@@ -2,13 +2,14 @@
 // One pane: where it lives, its live terminal (watching, or in control), the key
 // buttons and the prompt bar.
 import { computed, defineAsyncComponent, ref, shallowRef, watch } from "vue";
-import { ArrowLeft, Keyboard, LogOut, Maximize2, SearchX, TriangleAlert, Info, OctagonAlert } from "@lucide/vue";
+import { ArrowLeft, FileUp, Keyboard, LogOut, Maximize2, SearchX, TriangleAlert, Info, OctagonAlert } from "@lucide/vue";
 import HarnessIcon from "./HarnessIcon.vue";
 import StatePill from "./StatePill.vue";
 import KeyBar from "./KeyBar.vue";
 import PromptBar from "./PromptBar.vue";
 import PaneMenu from "./PaneMenu.vue";
-import { closePane, confirmAsk, paneIndex } from "../lib/store";
+import { closePane, confirmAsk, notify, paneIndex } from "../lib/store";
+import { draggingFiles, filesOf } from "../lib/attach";
 import { harnessOf, type PaneInfo } from "../lib/fleet";
 import type { TermState } from "../lib/term";
 
@@ -28,8 +29,10 @@ interface TerminalControls {
   release: () => void;
   fit: () => void;
   dismiss: () => void;
+  uploadAndType: (files: File[]) => Promise<boolean>;
 }
 const term = ref<TerminalControls>();
+const prompt = ref<{ addFiles: (files: File[]) => void }>();
 const state = ref<TermState>();
 const control = computed(() => state.value?.mode === "control");
 const controlling = computed(() => control.value && state.value?.phase === "open");
@@ -63,6 +66,43 @@ async function takeOver() {
   if (ok) term.value?.takeControl(true);
 }
 
+// ---------------------------------------------------------------- files dropped on the pane
+// In control they upload and their paths are typed at the cursor; otherwise they attach to
+// the prompt. A drop on the prompt bar itself always attaches (PromptBar handles that one).
+
+const dropMode = computed<"terminal" | "prompt" | "none">(() =>
+  !canInput.value ? "none" : controlling.value ? "terminal" : p.value?.harness ? "prompt" : "none",
+);
+const filesOver = ref(false);
+let depth = 0;
+
+function onDragEnter(e: DragEvent) {
+  if (!draggingFiles(e.dataTransfer)) return;
+  depth++;
+  filesOver.value = true;
+}
+function onDragOver(e: DragEvent) {
+  if (!draggingFiles(e.dataTransfer)) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = dropMode.value === "none" ? "none" : "copy";
+}
+function onDragLeave(e: DragEvent) {
+  if (!draggingFiles(e.dataTransfer)) return;
+  depth = Math.max(0, depth - 1);
+  if (!depth) filesOver.value = false;
+}
+function onDrop(e: DragEvent) {
+  depth = 0;
+  filesOver.value = false;
+  if (e.defaultPrevented || !draggingFiles(e.dataTransfer)) return;
+  e.preventDefault();
+  const files = filesOf(e.dataTransfer);
+  if (!files.length) return;
+  if (dropMode.value === "terminal") void term.value?.uploadAndType(files);
+  else if (dropMode.value === "prompt") prompt.value?.addFiles(files);
+  else notify(why.value || "This is a plain shell: take control to drop files into it.", "warn");
+}
+
 /** What the header calls each level, skipping the ones the tree skips. */
 const crumbs = computed(() => {
   const x = p.value;
@@ -76,7 +116,14 @@ const crumbs = computed(() => {
 </script>
 
 <template>
-  <div v-if="p" class="pane-view">
+  <div
+    v-if="p"
+    class="pane-view"
+    @dragenter="onDragEnter"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
     <header class="pane-head">
       <button class="icon-button back" aria-label="Back to the fleet" @click="closePane"><ArrowLeft :size="20" /></button>
       <HarnessIcon :harness="p.harness" />
@@ -145,9 +192,16 @@ const crumbs = computed(() => {
 
     <TerminalView ref="term" :pane="p" :gone="gone" @state="state = $event" />
 
+    <div v-if="filesOver" class="pane-drop" :class="dropMode" aria-hidden="true">
+      <FileUp :size="26" />
+      <span v-if="dropMode === 'terminal'">Drop to upload and type the paths at the cursor</span>
+      <span v-else-if="dropMode === 'prompt'">Drop to attach to the prompt for {{ p.name }}</span>
+      <span v-else>{{ why || "Take control to drop files into a shell" }}</span>
+    </div>
+
     <footer class="pane-foot">
       <KeyBar :pane="p" :disabled="!canInput" :why="why || (p.harness || controlling ? '' : 'A plain shell: take control to type')" />
-      <PromptBar v-if="p.harness" :pane="p" :disabled="!canInput" />
+      <PromptBar v-if="p.harness" ref="prompt" :pane="p" :disabled="!canInput" />
     </footer>
   </div>
 

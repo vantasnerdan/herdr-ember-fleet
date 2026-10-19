@@ -655,10 +655,33 @@ func (h *Hub) machineOf(dock string) string {
 // liveSub is one page's live feed: a set of changed machines (or "all")
 // and a one-slot wakeup. Nothing is ever dropped: repeated changes coalesce.
 type liveSub struct {
-	mu    sync.Mutex
-	dirty map[string]bool
-	all   bool
-	wake  chan struct{}
+	mu     sync.Mutex
+	dirty  map[string]bool
+	all    bool
+	groups bool
+	fleet  bool
+	wake   chan struct{}
+}
+
+func (s *liveSub) poke() {
+	select {
+	case s.wake <- struct{}{}:
+	default:
+	}
+}
+
+func (s *liveSub) markGroups() {
+	s.mu.Lock()
+	s.groups = true
+	s.mu.Unlock()
+	s.poke()
+}
+
+func (s *liveSub) markFleet() {
+	s.mu.Lock()
+	s.fleet = true
+	s.mu.Unlock()
+	s.poke()
 }
 
 func (s *liveSub) mark(name string) {
@@ -669,19 +692,21 @@ func (s *liveSub) mark(name string) {
 		s.dirty[name] = true
 	}
 	s.mu.Unlock()
-	select {
-	case s.wake <- struct{}{}:
-	default:
-	}
+	s.poke()
+}
+
+type liveChanges struct {
+	dirty              map[string]bool
+	all, groups, fleet bool
 }
 
 // take returns and clears what changed.
-func (s *liveSub) take() (map[string]bool, bool) {
+func (s *liveSub) take() liveChanges {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	d, all := s.dirty, s.all
-	s.dirty, s.all = map[string]bool{}, false
-	return d, all
+	c := liveChanges{dirty: s.dirty, all: s.all, groups: s.groups, fleet: s.fleet}
+	s.dirty, s.all, s.groups, s.fleet = map[string]bool{}, false, false, false
+	return c
 }
 
 func (h *Hub) changed(dock string) {
@@ -729,6 +754,7 @@ func (h *Hub) RemoveDock(ctx context.Context, id string) error {
 		name = d.Name
 		delete(s.Docks, id)
 		s.Tombstones[id] = time.Now().UnixMilli()
+		dropDockMembersLocked(s, id)
 		return nil
 	})
 	if err != nil {
@@ -750,6 +776,7 @@ func (h *Hub) RemoveDock(ctx context.Context, id string) error {
 	}
 	log.Printf("removed %s (%s)", keys.Short(id), name)
 	h.changedAll()
+	h.groupsChanged()
 	return nil
 }
 

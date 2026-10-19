@@ -2,9 +2,9 @@
 // open, and the small dialogs and notices every component may raise.
 
 import { computed, reactive, ref, shallowRef } from "vue";
-import { api, ApiError, errorText, setCsrf, whenSignedOut } from "./api";
+import { api, ApiError, errorText, setCsrf, whenFleetRenamed, whenSignedOut } from "./api";
 import { allPanes, buildTree, parseRefKey, pathTo, refKey, type PaneInfo, type PaneRef } from "./fleet";
-import type { LiveMessage, Machine, Me } from "./types";
+import type { Group, LiveMessage, Machine, Me } from "./types";
 import { connectLive } from "./live";
 
 export type Phase = "loading" | "signed-out" | "signing-in" | "signin-failed" | "unreachable" | "ready";
@@ -30,13 +30,16 @@ export const blocked = computed(() => panes.value.filter((p) => live(p) && p.sta
 export const done = computed(() => panes.value.filter((p) => live(p) && p.status === "done"));
 export const docks = computed(() => machines.value.flatMap((m) => m.docks));
 
+/** The viewer's groups, in display order (lib/groups.ts derives and changes them). */
+export const groups = shallowRef<Group[]>([]);
+
 /** Ticks every 15 s so "last seen 3 min ago" stays true. */
 export const now = ref(Date.now());
 setInterval(() => (now.value = Date.now()), 15_000);
 
 // ---------------------------------------------------------------- per-viewer conveniences
 
-function load<T>(key: string, fallback: T): T {
+export function load<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
@@ -167,14 +170,24 @@ function signedOut() {
   stopLive?.();
   stopLive = undefined;
   machines.value = [];
+  groups.value = [];
   app.me = null;
   app.settings = null;
   if (app.phase !== "signin-failed") app.phase = "signed-out";
 }
 whenSignedOut(signedOut);
 
+function fleetRenamed(name: string) {
+  if (app.me && name) app.me.fleet = name;
+}
+whenFleetRenamed(fleetRenamed);
+
 export function applyLive(msg: LiveMessage) {
-  if (msg.type === "hello") machines.value = msg.fleet.machines ?? [];
+  if (msg.type === "hello") {
+    machines.value = msg.fleet.machines ?? [];
+    if (msg.groups) groups.value = msg.groups;
+  } else if (msg.type === "groups") groups.value = msg.groups ?? [];
+  else if (msg.type === "fleet") fleetRenamed(msg.name);
   else if (msg.type === "machine") {
     const list = machines.value.filter((m) => m.host !== msg.machine.host);
     machines.value = msg.machine.docks.length ? [...list, msg.machine] : list;
@@ -221,6 +234,7 @@ export async function boot() {
     setCsrf(me.csrf);
     app.me = me;
     machines.value = (await api.fleet()).machines ?? [];
+    groups.value = await loadGroups();
     app.phase = "ready";
     stopLive?.();
     stopLive = connectLive({
@@ -233,6 +247,16 @@ export async function boot() {
     app.phase = "unreachable";
     app.signinError = errorText(e);
     retry = setTimeout(() => void boot(), 4000);
+  }
+}
+
+/** Groups are optional: a hub without them still shows the fleet. */
+async function loadGroups(): Promise<Group[]> {
+  try {
+    return (await api.groups()).groups ?? [];
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) throw e;
+    return [];
   }
 }
 

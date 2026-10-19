@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/acme/autocert"
@@ -21,6 +22,7 @@ import (
 type Options struct {
 	Listen     string   // loopback address for the page, default 127.0.0.1:4790
 	Public     string   // a domain name: serve HTTPS on :443 with Let's Encrypt, and :80 for redirects
+	URL        string   // the public URL when a TLS proxy (Pangolin, Caddy, nginx...) forwards to Listen
 	Email      string   // optional contact for Let's Encrypt
 	DevOrigins []string // extra allowed origins, e.g. http://localhost:5173 for the Vite dev server
 }
@@ -37,14 +39,20 @@ func Serve(ctx context.Context, o Options) error {
 	if o.Listen == "" {
 		o.Listen = "127.0.0.1:4790"
 	}
-	base := "http://" + o.Listen
-	if o.Public != "" {
-		base = "https://" + o.Public
+	if o.URL != "" { // remember a URL given on the command line
+		if err := h.store.Update(func(s *State) error { s.URL = strings.TrimRight(o.URL, "/"); return nil }); err != nil {
+			return err
+		}
 	}
-	w, err := NewWeb(h, base, o.DevOrigins)
+	listen, public := o.Listen, h.publicURL()
+	if o.Public != "" {
+		listen, public = "", "https://"+o.Public
+	}
+	w, err := NewWeb(h, listen, public, o.DevOrigins)
 	if err != nil {
 		return err
 	}
+	base := w.Base()
 	go h.Run(ctx)
 	go func() {
 		if err := admin.Serve(ctx, AdminPath(), h.adminHandler(w)); err != nil {
@@ -120,6 +128,22 @@ func (h *Hub) adminHandler(w *Web) admin.Handler {
 			return map[string]any{"base": w.Base(), "relay": connected, "machines": h.Machines(), "links": h.Links()}, nil
 		case "links":
 			return h.Links(), nil
+		case "set-url":
+			var u struct {
+				URL string `json:"url"`
+			}
+			json.Unmarshal(args, &u)
+			u.URL = strings.TrimRight(strings.TrimSpace(u.URL), "/")
+			if u.URL != "" && !strings.HasPrefix(u.URL, "https://") {
+				return nil, errors.New("the public URL must start with https://")
+			}
+			if err := w.setURL(u.URL); err != nil {
+				return nil, err
+			}
+			if err := h.store.Update(func(s *State) error { s.URL = u.URL; return nil }); err != nil {
+				return nil, err
+			}
+			return map[string]string{"base": w.Base()}, nil
 		case "cancel-link":
 			return nil, h.CancelLink(a.ID)
 		case "remove":
@@ -127,4 +151,10 @@ func (h *Hub) adminHandler(w *Web) admin.Handler {
 		}
 		return nil, errors.New("unknown operation " + op)
 	}
+}
+
+func (h *Hub) publicURL() string {
+	var u string
+	h.store.View(func(s *State) { u = s.URL })
+	return u
 }

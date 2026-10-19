@@ -1,5 +1,5 @@
 /* Marbell Ember: navy glass, Space Mono, coral as the only thing that glows.
-   Values from Ember Fleet's web UI (ember-fleet/palette.mjs and its remapped sheets). */
+   Palette shared with marbell-ember's herdr and terminal themes. */
 
 :root {
   --ember-black: #000000;
@@ -126,8 +126,8 @@ select {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: #556c9a;
-  box-shadow: 0 0 0 2px rgb(110 155 245 / 0.06);
+  border-color: rgb(244 120 83 / 0.65);
+  box-shadow: 0 0 0 3px rgb(244 120 83 / 0.07);
 }
 input::placeholder,
 textarea::placeholder {
@@ -146,7 +146,7 @@ textarea {
   border: 1px solid var(--accent);
   font-weight: 700;
   border-radius: 7px;
-  box-shadow: var(--ember-halo);
+  box-shadow: 0 0 14px rgb(244 120 83 / 0.12);
   white-space: nowrap;
 }
 .primary:disabled {
@@ -158,7 +158,7 @@ textarea {
 }
 .secondary {
   padding: 8px 12px;
-  background: #182238;
+  background: rgb(24 34 56 / 0.75);
   border: 1px solid var(--ember-line-high);
   border-radius: 6px;
   white-space: nowrap;
@@ -238,7 +238,7 @@ kbd {
 }
 .dot.on {
   background: var(--ember-teal);
-  box-shadow: 0 0 6px rgb(79 209 197 / 0.4);
+
 }
 .dot.off {
   background: #3e4d6b;
@@ -385,9 +385,10 @@ kbd {
   max-height: 90dvh;
   overflow: auto;
   padding: 26px 28px;
-  background: var(--ember-raised);
+  background: linear-gradient(145deg, #162035, #0e1525);
   border: 1px solid #344465;
-  border-radius: 13px;
+  border-top-color: #46516b;
+  border-radius: 10px;
   box-shadow: 0 30px 100px rgb(0 0 0 / 0.45);
   scrollbar-width: thin;
   scrollbar-color: #2a3957 transparent;
@@ -545,4 +546,11 @@ a.primary {
   height: auto;
   min-height: 30px;
   border: 1px solid var(--line);
+}
+
+/* Keyboard focus stays crisp; only decoration softens at the edges. */
+:root { scrollbar-width: thin; scrollbar-color: #2c3955 transparent; }
+button, a, input, textarea, select { transition: background-color 120ms, border-color 120ms, color 120ms; }
+@media (max-width: 700px) {
+  .modal .icon-button { min-width: 36px; min-height: 36px; }
 }

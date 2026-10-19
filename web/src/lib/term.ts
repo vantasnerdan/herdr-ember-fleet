@@ -314,6 +314,13 @@ export class TermView {
     this.connect("observe");
   }
 
+  /** In control: type text at the cursor (a pasted file's path). False if not in control now. */
+  typeInput(text: string): boolean {
+    if (this.state.mode !== "control" || this.state.phase !== "open" || !text) return false;
+    this.send({ type: "input", text });
+    return true;
+  }
+
   /** In control: make the real pane the size of this box. */
   fitToWindow() {
     if (this.state.mode !== "control" || this.state.phase !== "open") return;

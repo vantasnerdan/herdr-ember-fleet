@@ -9,82 +9,92 @@
 
 /* ---------------------------------------------------------------- top bar */
 .topbar {
-  height: 56px;
-  min-height: 56px;
+  height: 76px;
+  min-height: 76px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 14px 0 16px;
+  gap: 24px;
+  padding: 0 24px;
   border-bottom: 1px solid var(--line);
   background: var(--ember-glass-high);
   z-index: 10;
 }
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 15px;
   min-width: 0;
+  padding: 0;
+  text-align: left;
 }
-.brandmark {
-  display: block;
-  width: 40px;
-  height: 22px;
+.brand-symbol {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 42px;
+  border-right: 1px solid var(--line);
+  padding-right: 15px;
   flex: none;
 }
-.brand strong {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  white-space: nowrap;
-}
-.brand .sep {
-  color: var(--ember-dim);
+.brandmark { display: block; width: 36px; height: 22px; }
+.brand-identity { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.brand-caption {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 .brand .fleet-name {
-  color: var(--ember-text);
+  color: var(--ember-bright);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
 }
-.top-actions {
-  display: flex;
-  align-items: center;
+.top-actions { display: flex; align-items: center; gap: 18px; flex: none; }
+.overview-button {
   gap: 8px;
-  flex: none;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.overview-button.active {
+  color: var(--ember-coral);
+  border-color: rgb(244 120 83 / 0.18);
+  background: rgb(244 120 83 / 0.05);
 }
 .summary-pill {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 3px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
 }
+.summary-pill b { font-weight: 400; color: var(--ember-text); }
 .needs-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 3px 11px;
-  border: 1px solid rgb(255 46 126 / 0.45);
-  border-radius: 999px;
-  color: var(--ember-blocked);
-  background: rgb(255 46 126 / 0.07);
-  font-size: 13px;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid rgb(255 46 126 / 0.24);
+  border-radius: 6px;
+  color: #ff91bb;
+  background: rgb(255 46 126 / 0.04);
+  font-size: 12px;
   white-space: nowrap;
 }
+.settings-button { width: 34px; height: 34px; border: 1px solid var(--line); }
 .connection {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px;
   white-space: nowrap;
-  padding: 0 4px;
+  padding: 0;
 }
 .connection i {
   display: inline-block;
@@ -111,27 +121,30 @@
   min-height: 0;
   display: flex;
   position: relative;
+  padding: 12px;
 }
 .sidebar {
   width: var(--sidebar-w, 340px);
+  max-width: calc(100% - 344px);
   flex: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 9px;
   background: #090e1b;
+  overflow: hidden;
 }
 .resizer {
-  flex: 0 0 6px;
-  width: 6px;
-  margin: 0 -3px;
+  flex: 0 0 12px;
+  width: 12px;
   cursor: col-resize;
   position: relative;
   z-index: 5;
 }
 .resizer:hover,
 .resizer.dragging {
-  background: rgb(244 120 83 / 0.2);
+  background: linear-gradient(90deg, transparent 5px, rgb(244 120 83 / 0.4) 5px, rgb(244 120 83 / 0.4) 7px, transparent 7px);
 }
 .stage {
   flex: 1;
@@ -146,11 +159,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 12px 10px 6px 16px;
+  padding: 16px 10px 9px 16px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 1.6px;
+  letter-spacing: 1.3px;
 }
 .tree-head > span {
   display: inline-flex;
@@ -164,11 +177,11 @@
 }
 .tree-filter {
   position: relative;
-  margin: 4px 10px 6px;
+  margin: 4px 12px 10px;
 }
 .tree-filter input {
   width: 100%;
-  padding: 7px 30px 7px 32px;
+  padding: 9px 30px 9px 32px;
   font-size: 13px;
   background: rgb(3 6 14 / 0.5);
 }
@@ -193,7 +206,7 @@
 .tree-list {
   flex: 1;
   overflow: auto;
-  padding: 2px 6px 16px;
+  padding: 2px 8px 16px;
   outline: none;
   scrollbar-width: thin;
   scrollbar-color: #2a3957 transparent;
@@ -393,10 +406,10 @@
 
 /* ---------------------------------------------------------------- needs you */
 .needs {
-  margin: 6px 8px 6px;
-  border: 1px solid rgb(255 46 126 / 0.3);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--ember-blocked) 4%, rgb(9 14 27 / 0.85));
+  margin: 12px 12px 2px;
+  border: 1px solid rgb(255 46 126 / 0.17);
+  border-radius: 6px;
+  background: rgb(255 46 126 / 0.025);
   overflow: hidden;
 }
 .needs.calm {
@@ -410,8 +423,8 @@
   padding: 7px 6px 7px 12px;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 1.6px;
-  color: var(--ember-blocked);
+  letter-spacing: 1.2px;
+  color: #ff91bb;
 }
 .needs.calm .needs-head {
   color: var(--muted);
@@ -513,43 +526,29 @@
   background: rgb(79 209 197 / 0.05);
 }
 
+/* Compact desktop keeps the identity readable at large sidebar widths. */
+@media (max-width: 1100px) {
+  .summary-pill { display: none; }
+  .top-actions { gap: 12px; }
+  .topbar { padding: 0 18px; }
+}
 /* ---------------------------------------------------------------- phone: one screen at a time */
 @media (max-width: 700px) {
-  .topbar {
-    height: 52px;
-    min-height: 52px;
-    padding: 0 8px 0 12px;
-    gap: 8px;
-  }
-  .brand {
-    gap: 9px;
-  }
-  .brand strong,
-  .brand .sep,
-  .summary-pill,
-  .connection .label {
-    display: none;
-  }
-  .resizer {
-    display: none;
-  }
-  .sidebar {
-    width: 100%;
-    border-right: 0;
-  }
-  .app-shell.has-pane .sidebar {
-    display: none;
-  }
-  .app-shell:not(.has-pane) .stage {
-    display: none;
-  }
-  .tree-row {
-    min-height: 40px;
-  }
-  .tree-row.pane {
-    min-height: 50px;
-  }
-  .needs-list {
-    max-height: 40dvh;
-  }
+  .topbar { height: 64px; min-height: 64px; padding: 0 12px; gap: 12px; }
+  .brand { gap: 10px; }
+  .brand-symbol { width: 30px; padding: 0; border: 0; }
+  .brandmark { width: 30px; }
+  .brand-caption { font-size: 8px; letter-spacing: 1px; }
+  .brand .fleet-name { font-size: 13px; }
+  .top-actions { gap: 10px; }
+  .overview-button, .summary-pill, .connection .label, .needs-pill { display: none; }
+  .fleet-main { padding: 8px; }
+  .resizer { display: none; }
+  .sidebar { width: 100%; max-width: none; }
+  .app-shell.has-pane .sidebar, .app-shell.empty .sidebar { display: none; }
+  .app-shell:not(.has-pane):not(.empty) .stage { display: none; }
+  .tree-row { min-height: 40px; }
+  .tree-row.pane { min-height: 50px; }
+  .needs-list { max-height: 32dvh; }
+  .settings-button { width: 36px; height: 36px; }
 }

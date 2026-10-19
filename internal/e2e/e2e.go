@@ -26,6 +26,7 @@ const (
 	KindControl  = "control"
 	KindAction   = "action"
 	KindEndpoint = "endpoint"
+	KindUpload   = "upload"
 )
 
 // Header is the first line the hub sends inside a channel. The dock decides
@@ -43,6 +44,8 @@ type Header struct {
 	Epoch    string          `json:"epoch,omitempty"`
 	Method   string          `json:"method,omitempty"`
 	Params   json.RawMessage `json:"params,omitempty"`
+	Name     string          `json:"name,omitempty"` // upload: the file's name
+	Size     int64           `json:"size,omitempty"` // upload: exact byte count that follows
 }
 
 // Reply is the dock's first line back.
@@ -53,6 +56,8 @@ type Reply struct {
 	// pair
 	LinkID string `json:"link_id,omitempty"`
 	Proof  []byte `json:"proof,omitempty"`
+	// upload
+	Path string `json:"path,omitempty"`
 	// action
 	Result  json.RawMessage `json:"result,omitempty"`
 	Outcome string          `json:"outcome,omitempty"` // "not_sent" or "unknown" when OK is false

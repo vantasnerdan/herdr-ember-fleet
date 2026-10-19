@@ -6,7 +6,8 @@
 //
 //   plate    WebGL, behind the UI: the out-of-focus shot behind the glass, after
 //            ember/make_plate.py. Warm source low left, cool spill top right, bokeh,
-//            vignette, lens falloff, grain. Drawn once per resize.
+//            vignette, lens falloff, grain. A small, pointer-driven lens shift settles
+//            and sleeps; no continuous background loop.
 //   light    WebGL, over the UI, click-through and additive:
 //              ignition  one line of coral light runs down the window when it takes focus
 //              caret     the text caret leaves a coral thread when it moves, and breathes
@@ -36,6 +37,8 @@ void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
 const PLATE = `#version 300 es
 precision highp float;
 uniform vec2 uRes;
+uniform vec2 uParallax;
+uniform float uSeam;        // sidebar edge, in fractions of the window; -1 when absent
 uniform vec4 uBokeh[9];       // centre, radii (fractions of the window)
 uniform vec4 uBokehColor[9];  // rgb, strength
 out vec4 outColor;
@@ -53,11 +56,13 @@ float grain(vec2 p) {
 
 void main() {
   vec2 p = vec2(gl_FragCoord.x / uRes.x, 1.0 - gl_FragCoord.y / uRes.y);
+  vec2 screen = p;
+  p += uParallax * vec2(0.014, 0.010);
   vec3 c = vec3(7.0, 11.0, 22.0) / 255.0;
   // out-of-focus practicals: one warm source low left, cool spill top right, deep blue mid
-  c += blob(p, vec2(0.10, 0.92), vec2(0.34, 0.42), vec3(244.0, 120.0, 83.0) / 255.0, 0.150);
-  c += blob(p, vec2(0.93, 0.06), vec2(0.40, 0.46), vec3(79.0, 209.0, 197.0) / 255.0, 0.075);
-  c += blob(p, vec2(0.55, 0.45), vec2(0.55, 0.60), vec3(40.0, 62.0, 120.0) / 255.0, 0.110);
+  c += blob(p, vec2(0.10, 0.92), vec2(0.34, 0.42), vec3(244.0, 120.0, 83.0) / 255.0, 0.235);
+  c += blob(p, vec2(0.93, 0.06), vec2(0.40, 0.46), vec3(79.0, 209.0, 197.0) / 255.0, 0.080);
+  c += blob(p, vec2(0.55, 0.45), vec2(0.55, 0.60), vec3(40.0, 62.0, 120.0) / 255.0, 0.155);
   c += blob(p, vec2(0.80, 0.98), vec2(0.22, 0.20), vec3(242.0, 184.0, 102.0) / 255.0, 0.045);
   for (int i = 0; i < 9; i++) c += blob(p, uBokeh[i].xy, uBokeh[i].zw, uBokehColor[i].rgb, uBokehColor[i].a);
   c = clamp(c, 0.0, 1.0);
@@ -68,6 +73,13 @@ void main() {
   vec2 l = p - 0.5;
   lin *= 1.0 - 0.44 * dot(l, l);
   c = mix(lin * 12.92, 1.055 * pow(max(lin, vec3(1e-9)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, lin));
+  // A warm reflection catches the glass seam. Its falloff stays behind the UI;
+  // the neutral/cool fields above are the plate, never luminous UI accents.
+  if (uSeam > 0.0) {
+    float d = abs(screen.x - uSeam);
+    float bank = exp(-pow((screen.y - 0.72) / 0.36, 2.0));
+    c += vec3(0.957, 0.471, 0.325) * bank * (exp(-d * 90.0) * 0.025 + exp(-d * 14.0) * 0.010);
+  }
   // fine silver grain dithers the gradients
   c += (grain(gl_FragCoord.xy) - 0.5) * 0.02;
   outColor = vec4(c, 1.0);
@@ -122,6 +134,8 @@ void main() {
     vec4 k = uClip[i];
     if (px.x < k.x || px.y < k.y || px.x > k.z || px.y > k.w) continue;
     vec4 b = uBeacon[i];
+    // Most pixels are nowhere near a beacon: avoid their distance/exp work.
+    if (any(lessThan(px, b.xy - 26.0)) || any(greaterThan(px, b.xy + b.zw + 26.0))) continue;
     float d = sdBox(px, b.xy + b.zw * 0.5, b.zw * 0.5);
     // light around the shape, never on it; big cards glow less than dots
     float halo = exp(-max(d, 0.0) / 4.5) * step(0.0, d);
@@ -203,10 +217,14 @@ function program(gl: WebGL2RenderingContext, fragment: string): Uniform {
   };
   const prog = gl.createProgram();
   if (!prog) throw new Error("program");
-  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERTEX));
-  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragment));
+  const vert = compile(gl.VERTEX_SHADER, VERTEX);
+  const frag = compile(gl.FRAGMENT_SHADER, fragment);
+  gl.attachShader(prog, vert);
+  gl.attachShader(prog, frag);
   gl.bindAttribLocation(prog, 0, "p");
   gl.linkProgram(prog);
+  gl.deleteShader(vert);
+  gl.deleteShader(frag);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || "link");
   gl.useProgram(prog);
   // one triangle that covers the screen
@@ -312,7 +330,7 @@ function caretOf(field: HTMLInputElement | HTMLTextAreaElement): Box | null {
 }
 
 // The ancestors that clip an element, so a beacon's halo stops where it does.
-const clippers = new WeakMap<Element, Element[]>();
+let clippers = new WeakMap<Element, Element[]>();
 function visibleBox(el: Element): [number, number, number, number] | null {
   let list = clippers.get(el);
   if (!list) {
@@ -340,11 +358,20 @@ declare global {
 }
 
 export function startEffects() {
+  window.emberFx?.stop();
+  const root = document.documentElement;
+  // Also controls CSS decoration: fx=0 really disables all effects, even without WebGL.
+  root.dataset.emberFx = "off";
   if (new URLSearchParams(location.search).get("fx") === "0") return;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   const plate = layer(-1);
   const light = layer(2147483001, "plus-lighter");
-  if (!plate || !light) return;
+  const release = (l: Layer | null) => l?.gl.getExtension("WEBGL_lose_context")?.loseContext();
+  if (!plate || !light) {
+    release(plate);
+    release(light);
+    return;
+  }
 
   let u: Uniform;
   let p: Uniform;
@@ -356,15 +383,13 @@ export function startEffects() {
     u = program(light.gl, LIGHT);
   } catch (error) {
     console.warn("Ember effects are off:", error);
+    release(plate);
+    release(light);
     return;
   }
 
-  const bank = document.createElement("div");
-  bank.className = "ember-bank";
-  bank.setAttribute("aria-hidden", "true");
   document.body.prepend(plate.canvas);
-  document.body.append(bank, light.canvas);
-  const root = document.documentElement;
+  document.body.append(light.canvas);
   const now = () => performance.now() / 1000;
 
   let focused = document.hasFocus();
@@ -376,15 +401,30 @@ export function startEffects() {
   let frame = 0;
   let last = 0;
   let stopped = false;
+  let measuredAt = -1e6;
+  let beaconCount = 0;
+  const boxes = new Float32Array(MAX_BEACONS * 4);
+  const clips = new Float32Array(MAX_BEACONS * 4);
+  const kinds = new Float32Array(MAX_BEACONS);
+  const pointer = { x: 0, y: 0, fromX: 0, fromY: 0, targetX: 0, targetY: 0, at: 0 };
+  let plateDirty = true;
+  let seam = -1;
+  // Bound fill work on HiDPI/4K displays; all light shapes are deliberately soft.
+  const pixelScale = (budget: number, cap: number) =>
+    Math.min(devicePixelRatio || 1, cap, Math.sqrt(budget / Math.max(1, innerWidth * innerHeight)));
   root.classList.toggle("ember-banked", !focused);
 
   const drawPlate = () => {
-    fit(plate.canvas, plate.gl, 1);
+    fit(plate.canvas, plate.gl, pixelScale(1_200_000, 1));
     plate.gl.uniform2f(p("uRes"), plate.canvas.width, plate.canvas.height);
+    plate.gl.uniform2f(p("uParallax"), pointer.x, pointer.y);
+    plate.gl.uniform1f(p("uSeam"), seam);
+    plateDirty = false;
     plate.gl.drawArrays(plate.gl.TRIANGLES, 0, 3);
   };
 
   const findBeacons = () => {
+    clippers = new WeakMap(); // Vue can move a row between machine/group parents.
     const found: { el: Element; kind: number }[] = [];
     for (const [kind, selectors] of [
       [1, beacons.blocked],
@@ -393,11 +433,15 @@ export function startEffects() {
       for (const el of document.querySelectorAll(selectors.join(","))) found.push({ el, kind });
     }
     lit = found;
+    measuredAt = -1e6;
+    const sidebar = document.querySelector(".sidebar")?.getBoundingClientRect();
+    const nextSeam = sidebar && sidebar.width > 0 && innerWidth > 700 ? (sidebar.right + 6) / innerWidth : -1;
+    if (nextSeam !== seam) { seam = nextSeam; plateDirty = true; }
   };
 
   const drawLight = (t: number, live: boolean) => {
     const gl = light.gl;
-    const scale = Math.min(devicePixelRatio || 1, 1.5);
+    const scale = pixelScale(1_500_000, 1.25);
     fit(light.canvas, gl, scale);
     gl.uniform2f(u("uRes"), innerWidth, innerHeight);
     gl.uniform1f(u("uScale"), light.canvas.width / innerWidth);
@@ -412,37 +456,64 @@ export function startEffects() {
     gl.uniform1f(u("uCaretT"), reduced.matches ? 1e6 : t - caretAt);
     gl.uniform1f(u("uBreath"), caret && live ? 1 : 0);
 
-    const boxes: number[] = [];
-    const clips: number[] = [];
-    const kinds: number[] = [];
-    for (const { el, kind } of lit) {
-      if (kinds.length >= MAX_BEACONS) break;
-      const r = el.getBoundingClientRect();
-      if (!r.width || !r.height) continue;
-      const clip = visibleBox(el);
-      if (!clip) continue;
-      if (r.right < clip[0] || r.left > clip[2] || r.bottom < clip[1] || r.top > clip[3]) continue;
-      // skip beacons something else (a dialog) is covering
-      const hit = document.elementFromPoint(
-        Math.min(Math.max(r.left + r.width / 2, clip[0]), clip[2] - 1),
-        Math.min(Math.max(r.top + r.height / 2, clip[1]), clip[3] - 1),
-      );
-      if (hit && !el.contains(hit) && !hit.contains(el)) continue;
-      boxes.push(r.left, r.top, r.width, r.height);
-      clips.push(...clip);
-      kinds.push(kind);
+    // Layout reads are shared across frames. Scroll/resize/mutations invalidate
+    // immediately; the low-rate refresh covers font loads and CSS layout changes.
+    if (t - measuredAt > 0.2) {
+      measuredAt = t;
+      beaconCount = 0;
+      for (const { el, kind } of lit) {
+        if (beaconCount >= (innerWidth <= 700 ? 8 : MAX_BEACONS)) break;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        const clip = visibleBox(el);
+        if (!clip || r.right < clip[0] || r.left > clip[2] || r.bottom < clip[1] || r.top > clip[3]) continue;
+        // A modal or menu may obscure a beacon. Never illuminate through it.
+        const hit = document.elementFromPoint(
+          Math.min(Math.max(r.left + r.width / 2, clip[0]), clip[2] - 1),
+          Math.min(Math.max(r.top + r.height / 2, clip[1]), clip[3] - 1),
+        );
+        if (hit && !el.contains(hit) && !hit.contains(el)) continue;
+        boxes.set([r.left, r.top, r.width, r.height], beaconCount * 4);
+        clips.set(clip, beaconCount * 4);
+        kinds[beaconCount++] = kind;
+      }
+      gl.uniform1i(u("uCount"), beaconCount);
+      gl.uniform4fv(u("uBeacon"), boxes);
+      gl.uniform4fv(u("uClip"), clips);
+      gl.uniform1fv(u("uKind"), kinds);
     }
-    gl.uniform1i(u("uCount"), kinds.length);
-    if (kinds.length) {
-      const pad = (a: number[], n: number) => new Float32Array([...a, ...new Array(MAX_BEACONS * n - a.length).fill(0)]);
-      gl.uniform4fv(u("uBeacon"), pad(boxes, 4));
-      gl.uniform4fv(u("uClip"), pad(clips, 4));
-      gl.uniform1fv(u("uKind"), pad(kinds, 1));
-    }
+    gl.disable(gl.SCISSOR_TEST);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    return kinds.length > 0;
+    if (!reduced.matches && t - sweepAt >= 0 && t - sweepAt < SWEEP_TIME) {
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    } else {
+      // Between ignition sweeps, shade only the small regions that emit light.
+      // Overlaps are safe: each pass writes the same combined colour (no GL blend).
+      const sx = light.canvas.width / innerWidth;
+      const sy = light.canvas.height / innerHeight;
+      const region = (x: number, y: number, w: number, h: number, pad: number) => {
+        const left = Math.max(0, Math.floor((x - pad) * sx));
+        const right = Math.min(light.canvas.width, Math.ceil((x + w + pad) * sx));
+        const bottom = Math.max(0, Math.floor((innerHeight - y - h - pad) * sy));
+        const top = Math.min(light.canvas.height, Math.ceil((innerHeight - y + pad) * sy));
+        if (right <= left || top <= bottom) return;
+        gl.scissor(left, bottom, right - left, top - bottom);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      };
+      gl.enable(gl.SCISSOR_TEST);
+      for (let i = 0; i < beaconCount; i++) {
+        const at = i * 4;
+        region(boxes[at], boxes[at + 1], boxes[at + 2], boxes[at + 3], 26);
+      }
+      if (caret && live) {
+        const tail = t - caretAt < THREAD_TIME ? q : c;
+        const x = Math.min(c.x, tail.x), y = Math.min(c.y, tail.y);
+        region(x, y, Math.max(c.x + c.w, tail.x + tail.w) - x, Math.max(c.y + c.h, tail.y + tail.h) - y, c.h * 2);
+      }
+      gl.disable(gl.SCISSOR_TEST);
+    }
+    return beaconCount > 0;
   };
 
   const draw = (ms: number) => {
@@ -458,12 +529,22 @@ export function startEffects() {
       return;
     }
     last = ms;
+    const movingPlate = motion && focused &&
+      Math.abs(pointer.targetX - pointer.x) + Math.abs(pointer.targetY - pointer.y) > 0.0001;
+    if (movingPlate) {
+      // Time based, so a slow GPU also settles in 320 ms instead of chasing frames.
+      const ease = 1 - (1 - Math.min(1, Math.max(0, t - pointer.at) / 0.32)) ** 3;
+      pointer.x = pointer.fromX + (pointer.targetX - pointer.fromX) * ease;
+      pointer.y = pointer.fromY + (pointer.targetY - pointer.fromY) * ease;
+      plateDirty = true;
+    }
+    if (plateDirty) drawPlate();
     const beaconsShown = drawLight(t, live);
-    if (busy || (live && (caret || beaconsShown))) frame = requestAnimationFrame(draw);
+    if (busy || movingPlate || (live && (caret || beaconsShown))) frame = requestAnimationFrame(draw);
     else last = 0;
   };
   const kick = () => {
-    if (!frame && !stopped) frame = requestAnimationFrame(draw);
+    if (!frame && !stopped && !document.hidden) frame = requestAnimationFrame(draw);
   };
 
   const moveCaret = (quiet: boolean) => {
@@ -481,7 +562,7 @@ export function startEffects() {
   };
   let caretQueued = 0;
   const queueCaret = (quiet = false) => {
-    if (caretQueued) return;
+    if (caretQueued || stopped) return;
     caretQueued = requestAnimationFrame(() => {
       caretQueued = 0;
       moveCaret(quiet);
@@ -489,7 +570,7 @@ export function startEffects() {
   };
   let beaconsQueued = 0;
   const queueBeacons = () => {
-    if (beaconsQueued) return;
+    if (beaconsQueued || stopped) return;
     beaconsQueued = requestAnimationFrame(() => {
       beaconsQueued = 0;
       findBeacons();
@@ -510,21 +591,48 @@ export function startEffects() {
     kick();
   };
   const onResize = () => {
-    drawPlate();
+    plateDirty = true;
+    queueBeacons();
     queueCaret(true);
     kick();
   };
   const onScroll = () => {
+    measuredAt = -1e6;
     queueCaret(true);
     kick();
   };
   const onCaret = () => queueCaret(false);
+  const onPointer = (event: PointerEvent) => {
+    if (reduced.matches || !focused || event.pointerType !== "mouse") return;
+    pointer.fromX = pointer.x;
+    pointer.fromY = pointer.y;
+    pointer.at = now();
+    pointer.targetX = event.clientX / innerWidth * 2 - 1;
+    pointer.targetY = event.clientY / innerHeight * 2 - 1;
+    kick();
+  };
+  const onMotion = () => {
+    pointer.x = pointer.y = pointer.fromX = pointer.fromY = pointer.targetX = pointer.targetY = 0;
+    sweepAt = caretAt = -1e6;
+    plateDirty = true;
+    kick();
+  };
+  const onVisibility = () => {
+    if (document.hidden) { cancelAnimationFrame(frame); frame = 0; }
+    else { measuredAt = -1e6; last = 0; kick(); }
+  };
   const observer = new MutationObserver(queueBeacons);
+  const layoutObserver = new ResizeObserver(onResize);
+  layoutObserver.observe(document.body);
 
   const stop = () => {
+    if (stopped) return;
     stopped = true;
     cancelAnimationFrame(frame);
+    cancelAnimationFrame(caretQueued);
+    cancelAnimationFrame(beaconsQueued);
     observer.disconnect();
+    layoutObserver.disconnect();
     window.removeEventListener("focus", onFocus);
     window.removeEventListener("blur", onBlur);
     window.removeEventListener("resize", onResize);
@@ -533,14 +641,16 @@ export function startEffects() {
     document.removeEventListener("input", onCaret, true);
     document.removeEventListener("focusin", onCaret);
     document.removeEventListener("focusout", onCaret);
-    document.removeEventListener("visibilitychange", kick);
-    reduced.removeEventListener("change", kick);
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("pointermove", onPointer);
+    reduced.removeEventListener("change", onMotion);
     plate.canvas.remove();
     light.canvas.remove();
-    bank.remove();
     mirror?.remove();
     root.classList.remove("ember-banked");
-    delete root.dataset.emberFx;
+    root.dataset.emberFx = "off";
+    release(plate);
+    release(light);
   };
   for (const canvas of [plate.canvas, light.canvas]) {
     canvas.addEventListener("webglcontextlost", (event) => {
@@ -557,8 +667,9 @@ export function startEffects() {
   document.addEventListener("input", onCaret, true);
   document.addEventListener("focusin", onCaret);
   document.addEventListener("focusout", onCaret);
-  document.addEventListener("visibilitychange", kick);
-  reduced.addEventListener("change", kick);
+  document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("pointermove", onPointer, { passive: true });
+  reduced.addEventListener("change", onMotion);
   observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
 
   drawPlate();
@@ -568,3 +679,5 @@ export function startEffects() {
   root.dataset.emberFx = "on";
   window.emberFx = { stop };
 }
+
+if (import.meta.hot) import.meta.hot.dispose(() => window.emberFx?.stop());

@@ -10,8 +10,25 @@ const before = document.activeElement as HTMLElement | null;
 
 function keydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
+    e.preventDefault();
     e.stopPropagation();
     emit("close");
+  } else if (e.key === "Tab") {
+    const fields = [...(box.value?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+    ) ?? [])].filter((el) => el.getClientRects().length > 0);
+    const first = fields[0];
+    const last = fields[fields.length - 1];
+    if (!first) {
+      e.preventDefault();
+      box.value?.focus();
+    } else if (e.shiftKey && (document.activeElement === first || document.activeElement === box.value)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 }
 onMounted(async () => {
