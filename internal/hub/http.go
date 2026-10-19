@@ -106,6 +106,10 @@ func (w *Web) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me", w.me)
 	mux.HandleFunc("POST /api/signin", w.signin)
 	mux.HandleFunc("POST /api/signout", w.auth(w.signout))
+	mux.HandleFunc("POST /api/signin/ask", w.askSignin)
+	mux.HandleFunc("POST /api/signin/poll", w.pollSignin)
+	mux.HandleFunc("GET /api/signin/requests", w.auth(w.listAsks))
+	mux.HandleFunc("POST /api/signin/decide", w.auth(w.decideAsk))
 	mux.HandleFunc("GET /api/fleet", w.auth(w.fleet))
 	mux.HandleFunc("GET /api/live", w.auth(w.liveWS))
 	mux.HandleFunc("GET /api/term", w.auth(w.termWS))
@@ -201,6 +205,13 @@ func (w *Web) auth(next authed) http.HandlerFunc {
 			return
 		}
 		p := principal{kind: "browser", name: "owner", csrf: s.CSRF, cred: "session:" + s.Hash, expires: time.UnixMilli(s.Expires)}
+		// Sessions slide: in use, they don't run out (renewed at most daily).
+		if time.Until(p.expires) < sessionLife-sessionRenewGap {
+			if exp, renewed := w.h.renewSession(s.Hash); renewed {
+				p.expires = exp
+				w.setSessionCookie(rw, r, c.Value, time.Until(exp))
+			}
+		}
 		isWS := strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 		if isWS {
 			if !w.originOK(r) || !hasCSRFProtocol(r, s.CSRF) {
@@ -338,7 +349,7 @@ func (w *Web) liveWS(rw http.ResponseWriter, r *http.Request, p principal) {
 		return c.Write(wctx, websocket.MessageText, b)
 	}
 	machines := w.h.Machines()
-	if send(map[string]any{"type": "hello", "fleet": map[string]any{"machines": machines}, "groups": w.h.Groups()}) != nil {
+	if send(map[string]any{"type": "hello", "fleet": map[string]any{"machines": machines}, "groups": w.h.Groups(), "signinRequests": w.h.PendingAsks()}) != nil {
 		return
 	}
 	known := map[string]bool{}
@@ -372,6 +383,11 @@ func (w *Web) liveWS(rw http.ResponseWriter, r *http.Request, p principal) {
 		}
 		if ch.groups {
 			if send(map[string]any{"type": "groups", "groups": w.h.Groups()}) != nil {
+				return
+			}
+		}
+		if ch.signins {
+			if send(map[string]any{"type": "signin-requests", "requests": w.h.PendingAsks()}) != nil {
 				return
 			}
 		}

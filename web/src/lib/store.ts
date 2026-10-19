@@ -4,7 +4,7 @@
 import { computed, reactive, ref, shallowRef } from "vue";
 import { api, ApiError, errorText, setCsrf, whenFleetRenamed, whenSignedOut } from "./api";
 import { allPanes, buildTree, parseRefKey, refKey, type PaneInfo, type PaneRef } from "./fleet";
-import type { Group, LiveMessage, Machine, Me, UpdateStatus } from "./types";
+import type { Group, LiveMessage, Machine, Me, UpdateStatus, SigninAsk } from "./types";
 import { connectLive } from "./live";
 
 export type Phase = "loading" | "signed-out" | "signing-in" | "signin-failed" | "unreachable" | "ready";
@@ -35,6 +35,9 @@ export const groups = shallowRef<Group[]>([]);
 
 /** Fleet updates (versions, schedule, last run), kept live while settings are open. */
 export const updates = shallowRef<UpdateStatus | null>(null);
+
+/** Browsers asking to be signed in, for the approval banner. */
+export const signinRequests = shallowRef<SigninAsk[]>([]);
 
 /** Ticks every 15 s so "last seen 3 min ago" stays true. */
 export const now = ref(Date.now());
@@ -203,8 +206,10 @@ export function applyLive(msg: LiveMessage) {
   if (msg.type === "hello") {
     machines.value = byHost(msg.fleet.machines ?? []);
     if (msg.groups) groups.value = msg.groups;
+    signinRequests.value = msg.signinRequests ?? [];
   } else if (msg.type === "groups") groups.value = msg.groups ?? [];
   else if (msg.type === "updates") updates.value = msg.updates;
+  else if (msg.type === "signin-requests") signinRequests.value = msg.requests ?? [];
   else if (msg.type === "fleet") fleetRenamed(msg.name);
   else if (msg.type === "machine") {
     // Replace in place and keep the order stable (by name): appending moved

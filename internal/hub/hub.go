@@ -50,7 +50,8 @@ type Hub struct {
 	live     sync.Mutex
 	watchers map[*liveSub]struct{} // pages following the fleet
 
-	signins map[string]time.Time // one-time sign-in token hashes
+	signins map[string]time.Time  // one-time sign-in token hashes
+	asks    map[string]*signinAsk // browsers asking to be approved
 
 	upd updater
 
@@ -139,6 +140,7 @@ func New() (*Hub, error) {
 		pairing:  map[string]time.Time{},
 		watchers: map[*liveSub]struct{}{},
 		signins:  map[string]time.Time{},
+		asks:     map[string]*signinAsk{},
 		credCuts: map[string]map[*context.CancelFunc]struct{}{},
 		revoked:  map[string]bool{},
 	}, nil
@@ -674,7 +676,15 @@ type liveSub struct {
 	groups  bool
 	fleet   bool
 	updates bool
+	signins bool
 	wake    chan struct{}
+}
+
+func (s *liveSub) markSignins() {
+	s.mu.Lock()
+	s.signins = true
+	s.mu.Unlock()
+	s.poke()
 }
 
 func (s *liveSub) markUpdates() {
@@ -717,16 +727,16 @@ func (s *liveSub) mark(name string) {
 }
 
 type liveChanges struct {
-	dirty                       map[string]bool
-	all, groups, fleet, updates bool
+	dirty                                map[string]bool
+	all, groups, fleet, updates, signins bool
 }
 
 // take returns and clears what changed.
 func (s *liveSub) take() liveChanges {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c := liveChanges{dirty: s.dirty, all: s.all, groups: s.groups, fleet: s.fleet, updates: s.updates}
-	s.dirty, s.all, s.groups, s.fleet, s.updates = map[string]bool{}, false, false, false, false
+	c := liveChanges{dirty: s.dirty, all: s.all, groups: s.groups, fleet: s.fleet, updates: s.updates, signins: s.signins}
+	s.dirty, s.all, s.groups, s.fleet, s.updates, s.signins = map[string]bool{}, false, false, false, false, false
 	return c
 }
 

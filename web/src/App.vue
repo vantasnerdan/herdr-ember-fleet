@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watchEffect } from "vue";
 import TopBar from "./components/TopBar.vue";
+import SigninRequests from "./components/SigninRequests.vue";
 import FleetSidebar from "./components/FleetSidebar.vue";
 import PaneView from "./components/PaneView.vue";
 import EmptyFleet from "./components/EmptyFleet.vue";
@@ -50,6 +51,7 @@ function resize(e: PointerEvent) {
     :style="{ '--sidebar-w': `${sidebarWidth}px` }"
   >
     <TopBar />
+    <SigninRequests />
     <main class="fleet-main">
       <FleetSidebar />
       <div

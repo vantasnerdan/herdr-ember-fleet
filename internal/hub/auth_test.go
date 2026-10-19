@@ -14,7 +14,7 @@ func testHub(t *testing.T) *Hub {
 	}
 	return &Hub{store: st, docks: map[string]*dockLive{}, pairing: map[string]time.Time{},
 		watchers: map[*liveSub]struct{}{}, signins: map[string]time.Time{},
-		credCuts: map[string]map[*context.CancelFunc]struct{}{}, revoked: map[string]bool{}}
+		credCuts: map[string]map[*context.CancelFunc]struct{}{}, revoked: map[string]bool{}, asks: map[string]*signinAsk{}}
 }
 
 func tokenPrincipal(t *testing.T, h *Hub, tok string) principal {
@@ -153,5 +153,41 @@ func TestNewer(t *testing.T) {
 		if got := newer(c.a, c.b); got != c.want {
 			t.Errorf("newer(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+func TestSigninByApproval(t *testing.T) {
+	h := testHub(t)
+	id, code, poll := h.NewSigninAsk("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Safari/605.1.15")
+	if len(code) != 9 || code[4] != '-' {
+		t.Fatalf("code %q", code)
+	}
+	if asks := h.PendingAsks(); len(asks) != 1 || asks[0].Agent != "Safari on macOS" {
+		t.Fatalf("asks = %+v", asks)
+	}
+	if st, _, _, _ := h.collectAsk(id, poll); st != "pending" {
+		t.Fatalf("state before approval = %s", st)
+	}
+	if _, _, _, err := h.collectAsk(id, "someone-else"); err == nil {
+		t.Fatal("another browser could collect the session")
+	}
+	if err := h.DecideAsk(id, true); err != nil {
+		t.Fatal(err)
+	}
+	st, cookie, csrf, err := h.collectAsk(id, poll)
+	if err != nil || st != "approved" || cookie == "" || csrf == "" {
+		t.Fatalf("collect: %s %v", st, err)
+	}
+	if h.session(cookie) == nil {
+		t.Fatal("approved browser has no session")
+	}
+	if st, _, _, _ := h.collectAsk(id, poll); st != "expired" {
+		t.Fatalf("a request can be collected twice: %s", st)
+	}
+	// denied
+	id2, _, poll2 := h.NewSigninAsk("")
+	h.DecideAsk(id2, false)
+	if st, c, _, _ := h.collectAsk(id2, poll2); st != "denied" || c != "" {
+		t.Fatalf("denied request: %s %q", st, c)
 	}
 }

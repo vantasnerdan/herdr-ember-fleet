@@ -120,12 +120,21 @@ export interface HerdrSnapshot {
 // ---------------------------------------------------------------- live updates
 
 export type LiveMessage =
-  | { type: "hello"; fleet: { machines: Machine[] }; groups?: Group[] }
+  | { type: "hello"; fleet: { machines: Machine[] }; groups?: Group[]; signinRequests?: SigninAsk[] }
+  | { type: "signin-requests"; requests: SigninAsk[] }
   | { type: "machine"; machine: Machine }
   | { type: "removed"; host?: string; id?: string }
   | { type: "groups"; groups: Group[] }
   | { type: "fleet"; name: string }
   | { type: "updates"; updates: UpdateStatus };
+
+/** A browser asking to be signed in; the same code shows on both screens. */
+export interface SigninAsk {
+  id: string;
+  code: string;
+  agent: string; // "Chrome on macOS"
+  at: number;
+}
 
 // ---------------------------------------------------------------- updates
 

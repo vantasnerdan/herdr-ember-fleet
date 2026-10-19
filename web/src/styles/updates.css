@@ -88,3 +88,57 @@
   border-radius: 6px;
   padding: 8px;
 }
+
+/* Approving a browser that asks to sign in */
+.signin-requests {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: grid;
+  gap: 8px;
+  width: min(720px, calc(100vw - 32px));
+}
+.signin-request {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(11, 16, 30, 0.96);
+  border: 1px solid rgba(244, 120, 83, 0.55);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  color: var(--ember-text, #c9d3e3);
+}
+.signin-request-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.signin-request-text small {
+  color: var(--ember-dim, #687a9d);
+}
+.signin-request-code,
+.gate-code {
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(7, 11, 22, 0.9);
+  border: 1px solid rgba(30, 42, 68, 0.9);
+  color: #f4f7fb;
+}
+.gate-code {
+  display: inline-block;
+  font-size: 26px;
+  margin: 8px 0 12px;
+}
+@media (max-width: 700px) {
+  .signin-requests {
+    top: 64px;
+  }
+  .signin-request {
+    flex-wrap: wrap;
+  }
+}

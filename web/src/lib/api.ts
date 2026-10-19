@@ -2,7 +2,7 @@
 // from /api/me on every request that changes something. A 401 from anywhere means
 // the browser is signed out.
 
-import type { ActionRequest, ActionResult, Group, JoinLink, Machine, Me, Member, NewLink, Uploaded, UploadTarget, UpdateSettings, UpdateStatus } from "./types";
+import type { ActionRequest, ActionResult, Group, JoinLink, Machine, Me, Member, NewLink, Uploaded, UploadTarget, UpdateSettings, UpdateStatus, SigninAsk } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -136,6 +136,16 @@ export const api = {
       body: index === undefined ? { member, group } : { member, group, index },
     }),
   reorderGroups: (ids: string[]) => call<{ groups: Group[] }>("POST", "/api/groups/reorder", { body: { ids } }),
+
+  /** A browser that isn't signed in asks to be approved by one that is. */
+  askSignin: () => call<{ id: string; code: string; poll: string }>("POST", "/api/signin/ask", { body: {}, anonymous: true }),
+  pollSignin: (id: string, poll: string) =>
+    call<{ state: "pending" | "approved" | "denied" | "expired"; csrf?: string }>("POST", "/api/signin/poll", {
+      body: { id, poll },
+      anonymous: true,
+    }),
+  signinRequests: () => call<{ requests: SigninAsk[] }>("GET", "/api/signin/requests"),
+  decideSignin: (id: string, approve: boolean) => call<unknown>("POST", "/api/signin/decide", { body: { id, approve } }),
 
   updates: () => call<UpdateStatus>("GET", "/api/updates"),
   setUpdates: (s: Partial<UpdateSettings>) => call<UpdateStatus>("POST", "/api/updates", { body: s }),
