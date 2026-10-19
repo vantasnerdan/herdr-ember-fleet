@@ -1,0 +1,73 @@
+/* Settings → Updates */
+.update-settings {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+/* override the dialog's stacked label and full-width input styles */
+.modal .update-settings label.check {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0;
+  font-size: 13px;
+  text-align: left;
+}
+.modal .update-settings input[type="checkbox"] {
+  accent-color: var(--ember-coral, #f47853);
+  width: 15px;
+  height: 15px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  flex: none;
+}
+.modal .update-settings .check-text {
+  flex: 1;
+  min-width: 0;
+}
+.modal .update-settings label.check:has(.check-text) {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.modal .update-settings select {
+  width: auto;
+  background: rgba(7, 11, 22, 0.8);
+  color: inherit;
+  border: 1px solid rgba(104, 122, 157, 0.35);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font: inherit;
+}
+.update-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.update-list small {
+  display: block;
+}
+.update-list small.warn {
+  color: #f2b866;
+}
+.update-list .badge.ok {
+  color: #4fd1c5;
+}
+.update-list .badge.warn {
+  color: #f2b866;
+}
+@keyframes ember-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: ember-spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

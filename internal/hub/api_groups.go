@@ -171,3 +171,29 @@ func (h *Hub) Upload(ctx context.Context, operator, dock, session, pane, name st
 	}
 	return done.Path, 0, nil
 }
+
+func (w *Web) getUpdates(rw http.ResponseWriter, r *http.Request, p principal) {
+	jsonOut(rw, w.h.Updates())
+}
+
+func (w *Web) setUpdates(rw http.ResponseWriter, r *http.Request, p principal) {
+	u := w.h.updateSettings()
+	if readJSON(r, &u) != nil {
+		jsonErr(rw, http.StatusBadRequest, "bad request")
+		return
+	}
+	if err := w.h.SetUpdateSettings(u); err != nil {
+		jsonErr(rw, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.h.updatesChanged()
+	jsonOut(rw, w.h.Updates())
+}
+
+func (w *Web) runUpdates(rw http.ResponseWriter, r *http.Request, p principal) {
+	if !w.h.RunUpdates(context.WithoutCancel(r.Context()), "button") {
+		jsonErr(rw, http.StatusConflict, "an update run is already going")
+		return
+	}
+	jsonOut(rw, w.h.Updates())
+}

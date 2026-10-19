@@ -6,6 +6,7 @@ import { Check, Copy, KeyRound, Link2, LogOut, Pencil, Plus, Server, Trash2, X }
 import Modal from "./Modal.vue";
 import AddMachine from "./AddMachine.vue";
 import DeviceIcon from "./DeviceIcon.vue";
+import UpdatesPanel from "./UpdatesPanel.vue";
 import { api, errorText } from "../lib/api";
 import { ago } from "../lib/fleet";
 import { app, confirmAsk, machines, notify, now, promptAsk, signOut } from "../lib/store";
@@ -212,6 +213,8 @@ const loginCommand = computed(() => `ember-fleet login ${location.origin}`);
         <p v-else class="hint">No machines yet.</p>
         <button class="secondary" @click="app.settings = 'add'"><Plus :size="15" />Add a machine</button>
       </section>
+
+      <UpdatesPanel />
 
       <section class="fleet-section">
         <h3><Link2 :size="16" />Join links</h3>

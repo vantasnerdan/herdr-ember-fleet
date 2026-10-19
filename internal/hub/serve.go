@@ -54,6 +54,7 @@ func Serve(ctx context.Context, o Options) error {
 	}
 	base := w.Base()
 	go h.Run(ctx)
+	go h.updateLoop(ctx)
 	go func() {
 		if err := admin.Serve(ctx, AdminPath(), h.adminHandler(w)); err != nil {
 			log.Printf("admin socket: %v", err)
@@ -128,6 +129,17 @@ func (h *Hub) adminHandler(w *Web) admin.Handler {
 			return map[string]any{"base": w.Base(), "relay": connected, "machines": h.Machines(), "links": h.Links()}, nil
 		case "links":
 			return h.Links(), nil
+		case "update":
+			var only []string
+			if a.ID != "" {
+				only = []string{a.ID}
+			}
+			if !h.RunUpdates(ctx, "admin", only...) {
+				return nil, errors.New("an update run is already going")
+			}
+			return map[string]string{"target": Version}, nil
+		case "update-status":
+			return h.Updates(), nil
 		case "set-url":
 			var u struct {
 				URL string `json:"url"`

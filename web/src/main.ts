@@ -10,6 +10,7 @@ import "./styles/screens.css";
 import "./styles/extras.css";
 import "./styles/groups.css";
 import "./styles/attach.css";
+import "./styles/updates.css";
 
 import { createApp } from "vue";
 import App from "./App.vue";

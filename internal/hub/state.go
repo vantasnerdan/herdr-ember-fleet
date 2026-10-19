@@ -66,6 +66,10 @@ type State struct {
 	Tokens     map[string]*Token          `json:"tokens"`
 	Sessions   map[string]*BrowserSession `json:"sessions"`
 	Groups     []*Group                   `json:"groups"`
+
+	Updates       *UpdateSettings          `json:"updates,omitempty"`
+	UpdateLastRun int64                    `json:"update_last_run,omitempty"`
+	UpdateLog     map[string]*UpdateResult `json:"update_log,omitempty"`
 }
 
 // Store serializes every change to hub.json: one lock, one atomic write.

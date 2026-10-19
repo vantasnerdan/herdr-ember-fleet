@@ -124,6 +124,9 @@ func (w *Web) Handler() http.Handler {
 	mux.HandleFunc("POST /api/groups/move", w.auth(w.moveMember))
 	mux.HandleFunc("POST /api/groups/reorder", w.auth(w.reorderGroups))
 	mux.HandleFunc("POST /api/upload", w.auth(w.upload))
+	mux.HandleFunc("GET /api/updates", w.auth(w.getUpdates))
+	mux.HandleFunc("POST /api/updates", w.auth(w.setUpdates))
+	mux.HandleFunc("POST /api/updates/run", w.auth(w.runUpdates))
 	mux.HandleFunc("GET /api/tokens", w.auth(w.listTokens))
 	mux.HandleFunc("POST /api/tokens", w.auth(w.createToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", w.auth(w.revokeToken))
@@ -369,6 +372,11 @@ func (w *Web) liveWS(rw http.ResponseWriter, r *http.Request, p principal) {
 		}
 		if ch.groups {
 			if send(map[string]any{"type": "groups", "groups": w.h.Groups()}) != nil {
+				return
+			}
+		}
+		if ch.updates {
+			if send(map[string]any{"type": "updates", "updates": w.h.Updates()}) != nil {
 				return
 			}
 		}

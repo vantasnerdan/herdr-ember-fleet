@@ -110,6 +110,14 @@ Run `attach` from an ordinary terminal, not inside a herdr pane. Herdr refuses n
 
 From another computer, make a token on the hub (`ember-fleet token laptop`, or in the page's settings), then run `ember-fleet login https://fleet.example.com`.
 
+## Keeping the fleet current
+
+The hub hands its own `ember-fleet` build to every machine, over the same end-to-end channel it already uses. The dock checks the file's size, SHA-256 and reported version, swaps it in, and restarts itself. Then the dock runs `herdr update` on its machine. This happens once a day (04:00 hub time by default), or when you press **Update now** in Settings → Updates, where you also see every machine's versions and the last result. Only the owner role can update. A machine can opt out with `"accept_updates": false` in its `dock.json`.
+
+herdr is updated **without live handoff** by default. Running servers, and the agents' monitors, waits and pane-to-pane messages, are left alone, and pick up the new version on their next restart. Turn on live handoff to move running servers over at once. It keeps pane processes alive, but herdr calls it experimental, and connections in flight may be cut.
+
+From the hub's terminal: `ember-fleet update [DOCK-ID]` and `ember-fleet update-status`. To ship a new version, put the new binaries and a `VERSION` file in the hub's `dist/` (`scripts/build.sh` writes both) and restart the hub.
+
 ## Security model, briefly
 
 - **Joining.** A join link carries the relay's address and certificate pin, the hub's key fingerprint and a 256-bit secret. The dock derives a *ticket* for the relay and a *pairing key* the relay never sees. It proves its own key to the hub with the pairing key, inside TLS that pins the hub's key from the link. The hub keeps its own record of every link and binds each one to exactly one key. A relay that swaps keys, or replays a used or cancelled link, gets nothing. `internal/fleettest` tests each of these.

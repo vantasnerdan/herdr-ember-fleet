@@ -102,6 +102,24 @@ export function mockApi(): Plugin {
     for (const m of machines) for (const d of m.docks) if (d.id === dockId) return { m, d };
     return undefined;
   };
+  // updates (synthetic)
+  const updateSettings = { enabled: true, hour: 4, herdr: true, handoff: true };
+  let updateRunning = false;
+  let updateLastRun = 0;
+  const updateLog: Record<string, unknown> = {};
+  const updatesOut = () => ({
+    settings: updateSettings,
+    target: "0.2.6",
+    running: updateRunning,
+    lastRun: updateLastRun,
+    docks: machines.flatMap((m) =>
+      m.docks.map((d) => ({
+        id: d.id, machine: m.host, user: d.user, online: d.online, ember: updateLog[d.id] ? "0.2.6" : "0.2.4",
+        herdr: d.herdr, herdrServer: d.herdr, accepts: true, result: updateLog[d.id],
+      })),
+    ),
+  });
+
   const broadcast = (msg: unknown) => {
     const text = JSON.stringify(msg);
     for (const ws of live) if (ws.readyState === ws.OPEN) ws.send(text);
@@ -456,6 +474,26 @@ export function mockApi(): Plugin {
       const home = found.d.os === "darwin" ? `/Users/${found.d.user}` : `/home/${found.d.user}`;
       const path = `${home}/.cache/ember-fleet/uploads/${day}/${randomBytes(3).toString("hex")}-${safe}`;
       return json(res, 200, { ok: true, path, name, size });
+    }
+
+    if (path === "/api/updates" && method === "GET") return json(res, 200, updatesOut());
+    if (path === "/api/updates" && method === "POST") {
+      const b = (await readBody(req)) as Partial<typeof updateSettings>;
+      Object.assign(updateSettings, b);
+      broadcast({ type: "updates", updates: updatesOut() });
+      return json(res, 200, updatesOut());
+    }
+    if (path === "/api/updates/run" && method === "POST") {
+      if (updateRunning) return json(res, 409, { ok: false, error: "an update run is already going" });
+      updateRunning = true;
+      updateLastRun = Date.now();
+      broadcast({ type: "updates", updates: updatesOut() });
+      setTimeout(() => {
+        updateRunning = false;
+        for (const m of machines) for (const d of m.docks) updateLog[d.id] = { at: Date.now(), emberFrom: "0.2.4", emberTo: "0.2.6", herdrFrom: d.herdr, herdrTo: d.herdr };
+        broadcast({ type: "updates", updates: updatesOut() });
+      }, 4000);
+      return json(res, 200, updatesOut());
     }
 
     if (path === "/api/tokens" && method === "POST") {

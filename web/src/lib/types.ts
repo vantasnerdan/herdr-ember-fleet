@@ -122,7 +122,44 @@ export type LiveMessage =
   | { type: "machine"; machine: Machine }
   | { type: "removed"; host?: string; id?: string }
   | { type: "groups"; groups: Group[] }
-  | { type: "fleet"; name: string };
+  | { type: "fleet"; name: string }
+  | { type: "updates"; updates: UpdateStatus };
+
+// ---------------------------------------------------------------- updates
+
+export interface UpdateSettings {
+  enabled: boolean; // once a day
+  hour: number; // hub local time, 0-23
+  herdr: boolean; // also run `herdr update`
+  handoff: boolean; // move running herdr servers to the new version
+}
+export interface UpdateResult {
+  at: number;
+  emberFrom?: string;
+  emberTo?: string;
+  herdrFrom?: string;
+  herdrTo?: string;
+  servers?: string; // "default=0.9.5 work=0.9.5"
+  error?: string;
+}
+export interface UpdateDock {
+  id: string;
+  machine: string;
+  user: string;
+  online: boolean;
+  ember: string;
+  herdr: string; // installed
+  herdrServer: string; // running (default session)
+  accepts: boolean;
+  result?: UpdateResult;
+}
+export interface UpdateStatus {
+  settings: UpdateSettings;
+  target: string; // the ember-fleet version this hub hands out
+  running: boolean;
+  lastRun: number;
+  docks: UpdateDock[];
+}
 
 // ---------------------------------------------------------------- groups
 

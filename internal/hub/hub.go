@@ -52,6 +52,8 @@ type Hub struct {
 
 	signins map[string]time.Time // one-time sign-in token hashes
 
+	upd updater
+
 	credMu   sync.Mutex
 	credCuts map[string]map[*context.CancelFunc]struct{} // credential -> its live requests
 	revoked  map[string]bool                             // sessions signed out but not yet saved
@@ -655,12 +657,20 @@ func (h *Hub) machineOf(dock string) string {
 // liveSub is one page's live feed: a set of changed machines (or "all")
 // and a one-slot wakeup. Nothing is ever dropped: repeated changes coalesce.
 type liveSub struct {
-	mu     sync.Mutex
-	dirty  map[string]bool
-	all    bool
-	groups bool
-	fleet  bool
-	wake   chan struct{}
+	mu      sync.Mutex
+	dirty   map[string]bool
+	all     bool
+	groups  bool
+	fleet   bool
+	updates bool
+	wake    chan struct{}
+}
+
+func (s *liveSub) markUpdates() {
+	s.mu.Lock()
+	s.updates = true
+	s.mu.Unlock()
+	s.poke()
 }
 
 func (s *liveSub) poke() {
@@ -696,16 +706,16 @@ func (s *liveSub) mark(name string) {
 }
 
 type liveChanges struct {
-	dirty              map[string]bool
-	all, groups, fleet bool
+	dirty                       map[string]bool
+	all, groups, fleet, updates bool
 }
 
 // take returns and clears what changed.
 func (s *liveSub) take() liveChanges {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c := liveChanges{dirty: s.dirty, all: s.all, groups: s.groups, fleet: s.fleet}
-	s.dirty, s.all, s.groups, s.fleet = map[string]bool{}, false, false, false
+	c := liveChanges{dirty: s.dirty, all: s.all, groups: s.groups, fleet: s.fleet, updates: s.updates}
+	s.dirty, s.all, s.groups, s.fleet, s.updates = map[string]bool{}, false, false, false, false
 	return c
 }
 

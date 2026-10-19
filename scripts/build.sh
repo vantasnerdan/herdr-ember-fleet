@@ -23,5 +23,6 @@ for t in $targets; do
   echo "Building $out ($version)..."
   CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$out" ./cmd/ember-fleet
 done
+echo "$version" > dist/VERSION   # the hub pushes these builds to docks as this version
 (cd dist && sha256sum ember-fleet-* > SHA256SUMS 2>/dev/null || shasum -a 256 ember-fleet-* > SHA256SUMS)
 echo "Done: dist/"

@@ -4,7 +4,7 @@
 import { computed, reactive, ref, shallowRef } from "vue";
 import { api, ApiError, errorText, setCsrf, whenFleetRenamed, whenSignedOut } from "./api";
 import { allPanes, buildTree, parseRefKey, refKey, type PaneInfo, type PaneRef } from "./fleet";
-import type { Group, LiveMessage, Machine, Me } from "./types";
+import type { Group, LiveMessage, Machine, Me, UpdateStatus } from "./types";
 import { connectLive } from "./live";
 
 export type Phase = "loading" | "signed-out" | "signing-in" | "signin-failed" | "unreachable" | "ready";
@@ -32,6 +32,9 @@ export const docks = computed(() => machines.value.flatMap((m) => m.docks));
 
 /** The viewer's groups, in display order (lib/groups.ts derives and changes them). */
 export const groups = shallowRef<Group[]>([]);
+
+/** Fleet updates (versions, schedule, last run), kept live while settings are open. */
+export const updates = shallowRef<UpdateStatus | null>(null);
 
 /** Ticks every 15 s so "last seen 3 min ago" stays true. */
 export const now = ref(Date.now());
@@ -105,11 +108,10 @@ export function openPane(ref: PaneRef) {
 /** Back to the tree (on a phone) or to the overview. */
 export function closePane() {
   if (!selectedKey.value) return;
-  if ((history.state as { ember?: boolean } | null)?.ember) history.back();
-  else {
-    history.replaceState(null, "", `${location.pathname}${location.search}`);
-    selectedKey.value = null;
-  }
+  // Go to the overview itself. (Stepping back through history landed on the
+  // previously opened agent instead.) The browser's Back still returns to the pane.
+  history.pushState({ ember: true }, "", `${location.pathname}${location.search}`);
+  selectedKey.value = null;
 }
 
 window.addEventListener("popstate", () => {
@@ -200,6 +202,7 @@ export function applyLive(msg: LiveMessage) {
     machines.value = msg.fleet.machines ?? [];
     if (msg.groups) groups.value = msg.groups;
   } else if (msg.type === "groups") groups.value = msg.groups ?? [];
+  else if (msg.type === "updates") updates.value = msg.updates;
   else if (msg.type === "fleet") fleetRenamed(msg.name);
   else if (msg.type === "machine") {
     const list = machines.value.filter((m) => m.host !== msg.machine.host);

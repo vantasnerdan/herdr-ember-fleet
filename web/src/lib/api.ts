@@ -2,18 +2,7 @@
 // from /api/me on every request that changes something. A 401 from anywhere means
 // the browser is signed out.
 
-import type {
-  ActionRequest,
-  ActionResult,
-  Group,
-  JoinLink,
-  Machine,
-  Me,
-  Member,
-  NewLink,
-  Uploaded,
-  UploadTarget,
-} from "./types";
+import type { ActionRequest, ActionResult, Group, JoinLink, Machine, Me, Member, NewLink, Uploaded, UploadTarget, UpdateSettings, UpdateStatus } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -147,6 +136,10 @@ export const api = {
       body: index === undefined ? { member, group } : { member, group, index },
     }),
   reorderGroups: (ids: string[]) => call<{ groups: Group[] }>("POST", "/api/groups/reorder", { body: { ids } }),
+
+  updates: () => call<UpdateStatus>("GET", "/api/updates"),
+  setUpdates: (s: Partial<UpdateSettings>) => call<UpdateStatus>("POST", "/api/updates", { body: s }),
+  runUpdates: () => call<UpdateStatus>("POST", "/api/updates/run"),
 };
 
 export const MAX_UPLOAD = 50 * 1024 * 1024;

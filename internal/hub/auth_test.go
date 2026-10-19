@@ -134,3 +134,24 @@ func TestSetURLSwitchesAllowedNames(t *testing.T) {
 		t.Fatal("URL with a path accepted")
 	}
 }
+
+func TestNewer(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want bool
+	}{
+		{"0.2.6", "0.2.5", true},
+		{"0.2.10", "0.2.9", true},
+		{"1.0.0", "0.9.9", true},
+		{"0.2.5", "0.2.5", false},
+		{"0.2.4", "0.2.5", false}, // never downgrade
+		{"0.2.6", "dev", true},
+		{"0.2.6", "", true},
+		{"dev", "0.2.5", false},         // a dev hub never pushes
+		{"0.2.6-dirty", "0.2.5", false}, // nor a dirty build
+	} {
+		if got := newer(c.a, c.b); got != c.want {
+			t.Errorf("newer(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
+		}
+	}
+}

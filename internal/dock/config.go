@@ -32,12 +32,13 @@ const (
 	PermTakeover  = "terminal.takeover"
 	PermManage    = "session.manage"
 	PermAttach    = "endpoint.attach"
+	PermUpdate    = "fleet.update"
 )
 
 var rolePerms = map[string]map[string]bool{
 	RoleViewer:   {PermInventory: true, PermObserve: true},
 	RoleOperator: {PermInventory: true, PermObserve: true, PermControl: true, PermTakeover: true},
-	RoleOwner:    {PermInventory: true, PermObserve: true, PermControl: true, PermTakeover: true, PermManage: true, PermAttach: true},
+	RoleOwner:    {PermInventory: true, PermObserve: true, PermControl: true, PermTakeover: true, PermManage: true, PermAttach: true, PermUpdate: true},
 }
 
 // Allowed reports whether role grants perm.
@@ -54,11 +55,14 @@ type HubGrant struct {
 
 // Config is dock.json. The machine owner can edit roles here.
 type Config struct {
-	Relay       string     `json:"relay"`
-	Pin         string     `json:"pin"`
-	Name        string     `json:"name"`         // machine name, from the join link
-	KeepRunning bool       `json:"keep_running"` // start the default herdr server if it is not running
-	Hubs        []HubGrant `json:"hubs"`
+	Relay       string `json:"relay"`
+	Pin         string `json:"pin"`
+	Name        string `json:"name"`         // machine name, from the join link
+	KeepRunning bool   `json:"keep_running"` // start the default herdr server if it is not running
+	// AcceptUpdates lets the hub update ember-fleet and herdr on this machine
+	// (default true). Set it to false to update this machine by hand.
+	AcceptUpdates *bool      `json:"accept_updates,omitempty"`
+	Hubs          []HubGrant `json:"hubs"`
 
 	dir string
 }
@@ -151,3 +155,6 @@ func Join(ctx context.Context, link string) (*Config, error) {
 	}
 	return c, nil
 }
+
+// acceptsUpdates reports whether the hub may update this machine.
+func (c *Config) acceptsUpdates() bool { return c.AcceptUpdates == nil || *c.AcceptUpdates }

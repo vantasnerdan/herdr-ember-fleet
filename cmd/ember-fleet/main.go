@@ -215,6 +215,36 @@ func run(ctx context.Context, cmd string, args []string) error {
 			return errors.New("usage: ember-fleet term MACHINE[/USER]/PANE [--watch|--fit|--takeover]")
 		}
 		return cli.Term(ctx, fs.Arg(0), *watch, *fit, *takeover)
+	case "update":
+		// ember-fleet update [DOCK-ID]: update every machine (or one) now
+		args2 := map[string]string{}
+		if len(args) == 1 {
+			args2["id"] = args[0]
+		}
+		if err := admin.Call(hub.AdminPath(), "update", args2, nil); err != nil {
+			return hubErr(err)
+		}
+		fmt.Println("Updating; follow it in the page's settings, or: ember-fleet update-status")
+		return nil
+	case "update-status":
+		var st hub.UpdateStatus
+		if err := admin.Call(hub.AdminPath(), "update-status", nil, &st); err != nil {
+			return hubErr(err)
+		}
+		fmt.Printf("hands out ember-fleet %s; daily at %02d:00: %v; herdr too: %v; live handoff: %v; running: %v\n",
+			st.Target, st.Settings.Hour, st.Settings.Enabled, st.Settings.Herdr, st.Settings.Handoff, st.Running)
+		for _, d := range st.Docks {
+			line := fmt.Sprintf("  %-16s %-14s ember-fleet %-8s herdr %-7s server %-7s", d.Machine, d.User, d.Ember, d.Herdr, d.HerdrServer)
+			if r := d.Result; r != nil {
+				if r.Error != "" {
+					line += "  last: " + r.Error
+				} else {
+					line += "  last: ok " + time.UnixMilli(r.At).Format("Jan 2 15:04")
+				}
+			}
+			fmt.Println(line)
+		}
+		return nil
 	case "status":
 		return status(ctx)
 	case "service":

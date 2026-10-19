@@ -167,6 +167,14 @@ func (d *Dock) channel(ctx context.Context, client pb.RelayClient, id string) {
 		if ch.need(PermControl) { // putting files on this machine is as strong as typing
 			d.upload(ctx, ch)
 		}
+	case e2e.KindUpdate:
+		if ch.need(PermUpdate) {
+			d.selfUpdate(ctx, ch)
+		}
+	case e2e.KindHerdrUp:
+		if ch.need(PermUpdate) {
+			d.herdrUpdate(ctx, ch)
+		}
 	default:
 		ch.fail("unknown_kind", "unknown channel kind")
 	}
