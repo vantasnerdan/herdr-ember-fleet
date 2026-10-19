@@ -82,8 +82,11 @@ function palette256(): string[] {
   return out;
 }
 
+// A solid background, as in Ghostty's Marbell Ember theme. A transparent one
+// makes the WebGL renderer draw a dark box behind every word on lines where
+// a program paints its own background (Claude Code's prompt and recap lines).
 export const EMBER_THEME: ITheme = {
-  background: "#00000000",
+  background: "#070b16",
   foreground: "#c9d3e3",
   cursor: "#f47853",
   cursorAccent: "#070b16",
@@ -172,7 +175,7 @@ export class TermView {
       lineHeight: 1,
       letterSpacing: 0,
       scrollback: 0,
-      allowTransparency: true,
+      allowTransparency: false,
       theme: EMBER_THEME,
       disableStdin: true,
       cursorBlink: false,

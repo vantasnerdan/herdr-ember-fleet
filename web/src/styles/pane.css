@@ -211,6 +211,10 @@
 .term-frame {
   flex: none;
   transform-origin: center center;
+  background: #070b16; /* the terminal's own glass, as in Ghostty */
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgba(30, 42, 68, 0.9), 0 18px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
 }
 .term-frame .xterm {
   padding: 0;
