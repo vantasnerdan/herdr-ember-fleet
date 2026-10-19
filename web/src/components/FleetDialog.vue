@@ -1,12 +1,13 @@
 <script setup lang="ts">
-// Fleet settings: machines and their users, join links waiting to be used, terminal
-// access tokens, this hub, and signing out. "Add a machine" is a view of its own.
+// Fleet settings: machines and their users, signing in (PIN, browsers), updates, join
+// links waiting to be used, command-line tokens, this hub, and signing out. "Add a machine" is a view of its own.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Check, Copy, KeyRound, Link2, LogOut, Pencil, Plus, Server, Trash2, X } from "@lucide/vue";
 import Modal from "./Modal.vue";
 import AddMachine from "./AddMachine.vue";
 import DeviceIcon from "./DeviceIcon.vue";
 import UpdatesPanel from "./UpdatesPanel.vue";
+import SigninPanel from "./SigninPanel.vue";
 import { api, errorText } from "../lib/api";
 import { ago } from "../lib/fleet";
 import { app, confirmAsk, machines, notify, now, promptAsk, signOut } from "../lib/store";
@@ -214,6 +215,8 @@ const loginCommand = computed(() => `ember-fleet login ${location.origin}`);
         <button class="secondary" @click="app.settings = 'add'"><Plus :size="15" />Add a machine</button>
       </section>
 
+      <SigninPanel />
+
       <UpdatesPanel />
 
       <section class="fleet-section">
@@ -238,10 +241,10 @@ const loginCommand = computed(() => `ember-fleet login ${location.origin}`);
       </section>
 
       <section class="fleet-section">
-        <h3><KeyRound :size="16" />Terminal access</h3>
+        <h3><KeyRound :size="16" />Command-line access</h3>
         <p class="hint">
-          A token lets <code>ember-fleet attach</code> and <code>ember-fleet term</code> reach this fleet from
-          another computer, through the hub.
+          Only for the <code>ember-fleet attach</code> and <code>ember-fleet term</code> commands on another
+          computer. To use this page there, you only need the PIN.
         </p>
         <form class="inline-form" @submit.prevent="makeToken">
           <input v-model="tokenName" name="token-name" placeholder="Name it, e.g. laptop" maxlength="60" aria-label="Token name" />

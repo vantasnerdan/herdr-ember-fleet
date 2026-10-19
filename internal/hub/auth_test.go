@@ -55,11 +55,11 @@ func TestRevokeCutsLiveSocketsAndLaterOnes(t *testing.T) {
 func TestSignOutCutsBrowserSockets(t *testing.T) {
 	h := testHub(t)
 	signin := h.NewSignin()
-	cookie, _, err := h.redeemSignin(signin)
+	cookie, _, err := h.redeemSignin(signin, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.redeemSignin(signin); err == nil {
+	if _, _, err := h.redeemSignin(signin, "test"); err == nil {
 		t.Fatal("a sign-in link worked twice")
 	}
 	s := h.session(cookie)

@@ -44,6 +44,7 @@ Run (normally as services, see 'service'):
 
 Use:
   ember-fleet login-link                      a one-time sign-in link for the page
+  ember-fleet pin [--off]                     a new sign-in PIN for the page (never expires)
   ember-fleet attach MACHINE[/USER] [--session NAME]   the herdr app on that machine, no SSH
   ember-fleet term MACHINE[/USER]/PANE [--watch|--fit|--takeover]
   ember-fleet login HUB-URL                   use a hub from another computer (asks for a token)
@@ -169,6 +170,24 @@ func run(ctx context.Context, cmd string, args []string) error {
 			return hubErr(err)
 		}
 		fmt.Printf("Open this within 15 minutes; it works once:\n\n  %s\n", res.URL)
+		return nil
+	case "pin":
+		off := len(args) > 0 && args[0] == "--off"
+		if len(args) > 0 && !off {
+			return errors.New("usage: ember-fleet pin [--off]   (choose your own PIN in the page's settings)")
+		}
+		var res struct {
+			PIN string `json:"pin"`
+			URL string `json:"url"`
+		}
+		if err := admin.Call(hub.AdminPath(), "pin", map[string]bool{"off": off}, &res); err != nil {
+			return hubErr(err)
+		}
+		if off {
+			fmt.Println("PIN sign-in is off. Browsers already signed in stay signed in.")
+			return nil
+		}
+		fmt.Printf("Sign-in PIN (replaces any earlier one; it doesn't expire):\n\n  %s\n\nType it on the sign-in page at %s\n", res.PIN, res.URL)
 		return nil
 	case "token":
 		name := "terminal"

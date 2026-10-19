@@ -156,6 +156,19 @@ func (h *Hub) adminHandler(w *Web) admin.Handler {
 				return nil, err
 			}
 			return map[string]string{"base": w.Base()}, nil
+		case "pin":
+			var a struct {
+				Off bool `json:"off"`
+			}
+			json.Unmarshal(args, &a)
+			if a.Off {
+				return map[string]bool{"off": true}, h.RemovePIN()
+			}
+			pin, err := h.SetPIN("")
+			if err != nil {
+				return nil, err
+			}
+			return map[string]string{"pin": pin, "url": w.Base()}, nil
 		case "cancel-link":
 			return nil, h.CancelLink(a.ID)
 		case "remove":

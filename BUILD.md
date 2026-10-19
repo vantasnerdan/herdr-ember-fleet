@@ -107,9 +107,13 @@ All JSON. Cookie auth with an exact `Origin` check; `X-Ember-CSRF` on every non-
 | Call | Does |
 |---|---|
 | `POST /api/signin {token}` | exchanges a one-time sign-in token for a session cookie |
-| `GET /api/me` | `{signedIn, csrf, fleet, hub, version}` |
+| `POST /api/signin/pin {pin}` | signs in with the fleet's PIN (401 wrong, 429 paused after too many wrong ones) |
+| `POST /api/signin/ask` · `poll {id, poll}` · `cancel {id, poll}` | a browser asks to be approved, waits, or withdraws; `GET /api/signin/requests` and `POST /api/signin/decide {id, approve}` for signed-in pages |
+| `GET/POST/DELETE /api/pin` | `{set, at}`; POST `{pin}` sets one, `{}` makes one and returns it once; DELETE turns PIN sign-in off |
+| `GET /api/sessions` · `DELETE /api/sessions/{id}` | signed-in browsers `{id, agent, via, created, seen, current}`; sign one out (its sockets close) |
+| `GET /api/me` | `{signedIn, csrf, fleet, hub, version, pin}` |
 | `GET /api/fleet` | `{machines: [Machine]}` |
-| `WS /api/live` | `{type:"hello", fleet}` first, then `{type:"machine", machine}` and `{type:"removed", host}` as things change (coalesced, never dropped) |
+| `WS /api/live` | `{type:"hello", fleet, version}` first (a page whose build differs offers a reload), then `{type:"machine", machine}` and `{type:"removed", host}` as things change (coalesced, never dropped) |
 | `WS /api/term?dock=&session=&epoch=&pane=&terminal=&mode=observe\|control&takeover=0\|1&cols=&rows=` | targets the exact server (epoch) and terminal the page last saw; `cols=0&rows=0` with control keeps the pane's real size. server→page `{type:"frame",seq,full,width,height,data}` (base64 ANSI) and `{type:"status",state,reason}` (`open`, `busy`, `closed`, `error` with `stale`/`gone`); page→server `{type:"input",text}`, `{type:"resize",cols,rows}`, `{type:"scroll",direction,lines}`, `{type:"release"}` |
 | `WS /api/endpoint?dock=&session=` | `attach`: raw herdr client bytes as binary messages (owner only) |
 | `POST /api/action {dock, session, epoch, method, params}` | `{ok, result}` or `{ok:false, error, outcome:"not_sent"\|"unknown"}` |

@@ -108,6 +108,13 @@ func (w *Web) Handler() http.Handler {
 	mux.HandleFunc("POST /api/signout", w.auth(w.signout))
 	mux.HandleFunc("POST /api/signin/ask", w.askSignin)
 	mux.HandleFunc("POST /api/signin/poll", w.pollSignin)
+	mux.HandleFunc("POST /api/signin/cancel", w.cancelSigninAsk)
+	mux.HandleFunc("POST /api/signin/pin", w.pinSignin)
+	mux.HandleFunc("GET /api/pin", w.auth(w.getPIN))
+	mux.HandleFunc("POST /api/pin", w.auth(w.setPIN))
+	mux.HandleFunc("DELETE /api/pin", w.auth(w.deletePIN))
+	mux.HandleFunc("GET /api/sessions", w.auth(w.listSessions))
+	mux.HandleFunc("DELETE /api/sessions/{id}", w.auth(w.endSessionID))
 	mux.HandleFunc("GET /api/signin/requests", w.auth(w.listAsks))
 	mux.HandleFunc("POST /api/signin/decide", w.auth(w.decideAsk))
 	mux.HandleFunc("GET /api/fleet", w.auth(w.fleet))
@@ -277,7 +284,8 @@ func readJSON(r *http.Request, v any) error {
 func (w *Web) me(rw http.ResponseWriter, r *http.Request) {
 	var fleet string
 	w.h.store.View(func(s *State) { fleet = s.Fleet })
-	out := map[string]any{"signedIn": false, "fleet": fleet, "hub": w.h.Fingerprint()[:12], "version": Version}
+	hasPIN, _ := w.h.PINSet()
+	out := map[string]any{"signedIn": false, "fleet": fleet, "hub": w.h.Fingerprint()[:12], "version": Version, "pin": hasPIN}
 	if c, err := r.Cookie(cookieName); err == nil {
 		if s := w.h.session(c.Value); s != nil {
 			out["signedIn"] = true
@@ -299,7 +307,7 @@ func (w *Web) signin(rw http.ResponseWriter, r *http.Request) {
 		jsonErr(rw, http.StatusBadRequest, "missing token")
 		return
 	}
-	cookie, csrf, err := w.h.redeemSignin(req.Token)
+	cookie, csrf, err := w.h.redeemSignin(req.Token, browserName(r.UserAgent()))
 	if err != nil {
 		jsonErr(rw, http.StatusUnauthorized, err.Error())
 		return
@@ -349,7 +357,7 @@ func (w *Web) liveWS(rw http.ResponseWriter, r *http.Request, p principal) {
 		return c.Write(wctx, websocket.MessageText, b)
 	}
 	machines := w.h.Machines()
-	if send(map[string]any{"type": "hello", "fleet": map[string]any{"machines": machines}, "groups": w.h.Groups(), "signinRequests": w.h.PendingAsks()}) != nil {
+	if send(map[string]any{"type": "hello", "fleet": map[string]any{"machines": machines}, "groups": w.h.Groups(), "signinRequests": w.h.PendingAsks(), "version": Version}) != nil {
 		return
 	}
 	known := map[string]bool{}

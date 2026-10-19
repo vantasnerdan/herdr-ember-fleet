@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // Everything before the fleet: connecting, signing in, signed out, hub unreachable.
-// Signed out, this browser asks to be approved: it shows a code, and any browser
-// that is already signed in approves it with one click (like signing in a TV).
-import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { LoaderCircle } from "@lucide/vue";
-import { api, errorText } from "../lib/api";
+// Signed out, there are two ways in: the fleet's PIN (it never expires, so it works
+// from any computer), or approval: this browser shows a code and a browser that is
+// already signed in approves it with one click (like signing in a TV).
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { Eye, EyeOff, LoaderCircle } from "@lucide/vue";
+import { api, ApiError, errorText } from "../lib/api";
 import { app, boot } from "../lib/store";
 
 const view = computed(() => {
@@ -21,6 +22,39 @@ const view = computed(() => {
       return { eyebrow: "Herdr Ember Fleet", title: "Opening your workspace…", busy: true };
   }
 });
+
+/** With a PIN set, the PIN comes first and approval is the fallback. */
+const mode = ref<"pin" | "approve">("pin");
+
+// ---------------------------------------------------------------- the PIN
+
+const pin = ref("");
+const showPin = ref(false);
+const pinBusy = ref(false);
+const pinError = ref("");
+const pinInput = ref<HTMLInputElement | null>(null);
+
+async function signInWithPin() {
+  if (!pin.value.trim() || pinBusy.value) return;
+  pinBusy.value = true;
+  pinError.value = "";
+  try {
+    await api.pinSignin(pin.value);
+    pin.value = "";
+    await withdrawAsk();
+    app.phase = "loading";
+    await boot();
+  } catch (e) {
+    pinError.value =
+      e instanceof ApiError && e.status === 401 ? "That PIN isn’t right. Check it and try again." : capital(errorText(e));
+    await nextTick();
+    pinInput.value?.select();
+  } finally {
+    pinBusy.value = false;
+  }
+}
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? "" : ".");
 
 // ---------------------------------------------------------------- asking for approval
 
@@ -50,6 +84,7 @@ function recall(): typeof ask.value {
 
 async function startAsk() {
   clearTimeout(timer);
+  mode.value = "approve";
   askError.value = "";
   askState.value = "asking";
   try {
@@ -90,11 +125,31 @@ async function poll() {
   timer = setTimeout(() => void poll(), 2000);
 }
 
+/** Takes back a waiting request, so signed-in browsers stop showing it. */
+async function withdrawAsk() {
+  clearTimeout(timer);
+  const a = ask.value ?? recall();
+  ask.value = null;
+  askState.value = "idle";
+  remember(null);
+  if (a) await api.cancelSignin(a.id, a.poll).catch(() => {});
+}
+
+async function usePin() {
+  await withdrawAsk();
+  mode.value = "pin";
+  await nextTick();
+  pinInput.value?.focus();
+}
+
 watch(
   () => app.phase,
   (p) => {
-    if (p === "signed-out" && askState.value === "idle") void startAsk();
-    if (p !== "signed-out") clearTimeout(timer);
+    if (p !== "signed-out") return clearTimeout(timer);
+    if (askState.value !== "idle") return;
+    // A request already waiting (this tab was reloaded), or no PIN to offer: ask.
+    if (recall() || !app.pinSignin) void startAsk();
+    else mode.value = "pin";
   },
   { immediate: true },
 );
@@ -116,22 +171,69 @@ function retry() {
         <LoaderCircle v-if="view.busy" :size="20" class="spin" />{{ view.title }}
       </h1>
       <template v-if="app.phase === 'signed-out'">
-        <template v-if="askState === 'waiting' && ask">
-          <p>Approve this browser from one where you’re already signed in. It shows this code:</p>
-          <code class="gate-code" aria-label="Sign-in code">{{ ask.code }}</code>
-          <p class="hint"><LoaderCircle :size="14" class="spin" /> Waiting for approval…</p>
-        </template>
-        <template v-else-if="askState === 'asking'">
-          <p class="hint"><LoaderCircle :size="14" class="spin" /> Asking to sign in…</p>
+        <template v-if="app.pinSignin && mode === 'pin'">
+          <form class="pin-form" @submit.prevent="signInWithPin">
+            <input type="text" name="username" autocomplete="username" value="Herdr Ember Fleet" hidden />
+            <label for="signin-pin">Your PIN</label>
+            <div class="pin-row">
+              <span class="pin-field">
+                <input
+                  id="signin-pin"
+                  ref="pinInput"
+                  v-model="pin"
+                  name="pin"
+                  :type="showPin ? 'text' : 'password'"
+                  autocomplete="current-password"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  maxlength="80"
+                  autofocus
+                  :disabled="pinBusy"
+                  :aria-invalid="!!pinError"
+                  aria-describedby="signin-pin-help"
+                  @input="pinError = ''"
+                />
+                <button
+                  type="button"
+                  class="icon-button"
+                  :aria-label="showPin ? 'Hide the PIN' : 'Show the PIN'"
+                  :title="showPin ? 'Hide' : 'Show'"
+                  @click="showPin = !showPin"
+                >
+                  <EyeOff v-if="showPin" :size="16" /><Eye v-else :size="16" />
+                </button>
+              </span>
+              <button class="primary" :disabled="pinBusy || !pin.trim()">
+                <LoaderCircle v-if="pinBusy" :size="15" class="spin" />Sign in
+              </button>
+            </div>
+            <p v-if="pinError" class="message-error" role="alert">{{ pinError }}</p>
+            <p v-else id="signin-pin-help" class="hint">This browser stays signed in while you use it.</p>
+          </form>
+          <button class="text-button gate-switch" @click="startAsk">
+            No PIN with you? Approve this browser from one that’s signed in
+          </button>
         </template>
         <template v-else>
-          <p v-if="askState === 'denied'" class="message-error" role="alert">That request was denied.</p>
-          <p v-else-if="askState === 'expired'" class="hint">That request expired.</p>
-          <p v-else-if="askState === 'error'" class="message-error" role="alert">{{ askError }}</p>
-          <button class="secondary" @click="startAsk">Ask to sign in</button>
+          <template v-if="askState === 'waiting' && ask">
+            <p>Approve this browser from one where you’re already signed in. It shows this code:</p>
+            <code class="gate-code" aria-label="Sign-in code">{{ ask.code }}</code>
+            <p class="hint"><LoaderCircle :size="14" class="spin" /> Waiting for approval (10 minutes)…</p>
+          </template>
+          <template v-else-if="askState === 'asking'">
+            <p class="hint"><LoaderCircle :size="14" class="spin" /> Asking to sign in…</p>
+          </template>
+          <template v-else>
+            <p v-if="askState === 'denied'" class="message-error" role="alert">That request was denied.</p>
+            <p v-else-if="askState === 'expired'" class="hint">That request expired.</p>
+            <p v-else-if="askState === 'error'" class="message-error" role="alert">{{ askError }}</p>
+            <button class="secondary" @click="startAsk">Ask to sign in</button>
+          </template>
+          <button v-if="app.pinSignin" class="text-button gate-switch" @click="usePin">Use your PIN instead</button>
         </template>
         <p class="hint gate-note">
-          No browser signed in yet? On the hub, run <code>ember-fleet login-link</code> and open the link here.
+          <template v-if="app.pinSignin">Forgot the PIN?</template><template v-else>No browser signed in yet?</template>
+          On the hub, run <code>ember-fleet pin</code> for a new PIN.
         </p>
       </template>
       <template v-else-if="app.phase === 'signin-failed'">

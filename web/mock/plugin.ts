@@ -188,6 +188,11 @@ export function mockApi(): Plugin {
     res.setHeader("Cache-Control", "no-store");
     res.end(JSON.stringify(body));
   };
+  const mockPin = { at: Date.now() - 3 * 3_600_000 };
+  let mockSessions = [
+    { id: "aaaaaaaaaaaaaaaa", agent: "Chrome on Linux", via: "link", created: Date.now() - 86_400_000, seen: Date.now() - 600_000, current: true },
+    { id: "bbbbbbbbbbbbbbbb", agent: "Safari on macOS", via: "pin", created: Date.now() - 1_200_000, current: false },
+  ];
   const signedIn = (req: IncomingMessage) => !(req.headers.cookie ?? "").includes(`${SIGNED_OUT}=1`);
   const readBody = (req: IncomingMessage) =>
     new Promise<Record<string, unknown>>((resolve) => {
@@ -279,8 +284,19 @@ export function mockApi(): Plugin {
     if (path === "/api/me" && method === "GET") {
       return json(res, 200, signedIn(req)
         ? { signedIn: true, csrf: CSRF, fleet: fleetName, hub: "SHA256:k7Qe…9fXw", version: "0.1.0-mock" }
-        : { signedIn: false, csrf: "", fleet: "", hub: "", version: "0.1.0-mock" });
+        : { signedIn: false, csrf: "", fleet: "", hub: "", version: "0.1.0-mock", pin: !!mockPin.at });
     }
+    if (path === "/api/signin/pin" && method === "POST") {
+      const { pin } = await readBody(req);
+      await later(300);
+      if (String(pin).replace(/[\s-]/g, "") !== "12345678") return json(res, 401, { error: "that PIN isn't right" });
+      res.setHeader("Set-Cookie", `${SIGNED_OUT}=0; Path=/; HttpOnly; SameSite=Strict`);
+      return json(res, 200, { ok: true, csrf: CSRF });
+    }
+    if ((path === "/api/signin/ask" || path === "/api/signin/cancel") && method === "POST") {
+      return json(res, 200, { ok: true, id: "ask1", code: "N56E-7G86", poll: "p" });
+    }
+    if (path === "/api/signin/poll" && method === "POST") return json(res, 200, { ok: true, state: "pending" });
     if (path === "/api/signin" && method === "POST") {
       const { token } = await readBody(req);
       await later(400);
@@ -476,6 +492,21 @@ export function mockApi(): Plugin {
       return json(res, 200, { ok: true, path, name, size });
     }
 
+    if (path === "/api/pin" && method === "GET") return json(res, 200, { set: !!mockPin.at, at: mockPin.at });
+    if (path === "/api/pin" && method === "POST") {
+      const { pin } = (await readBody(req)) as { pin?: string };
+      mockPin.at = Date.now();
+      return json(res, 200, { ok: true, set: true, at: mockPin.at, ...(pin ? {} : { pin: "1234-5678" }) });
+    }
+    if (path === "/api/pin" && method === "DELETE") {
+      mockPin.at = 0;
+      return json(res, 200, { ok: true, set: false, at: 0 });
+    }
+    if (path === "/api/sessions" && method === "GET") return json(res, 200, { sessions: mockSessions });
+    if (path.startsWith("/api/sessions/") && method === "DELETE") {
+      mockSessions = mockSessions.filter((x) => x.id !== path.slice("/api/sessions/".length));
+      return json(res, 200, { ok: true });
+    }
     if (path === "/api/updates" && method === "GET") return json(res, 200, updatesOut());
     if (path === "/api/updates" && method === "POST") {
       const b = (await readBody(req)) as Partial<typeof updateSettings>;

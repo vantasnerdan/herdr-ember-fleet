@@ -52,6 +52,9 @@ type BrowserSession struct {
 	CSRF    string `json:"csrf"`
 	Created int64  `json:"created"`
 	Expires int64  `json:"expires"`
+	Agent   string `json:"agent,omitempty"` // "Chrome on macOS"
+	Via     string `json:"via,omitempty"`   // pin, approval, link
+	Seen    int64  `json:"seen,omitempty"`  // last renewal (daily at most)
 }
 
 // State is hub.json.
@@ -66,6 +69,7 @@ type State struct {
 	Tokens     map[string]*Token          `json:"tokens"`
 	Sessions   map[string]*BrowserSession `json:"sessions"`
 	Groups     []*Group                   `json:"groups"`
+	SigninPIN  *PINRec                    `json:"signin_pin,omitempty"`
 
 	Updates       *UpdateSettings          `json:"updates,omitempty"`
 	UpdateLastRun int64                    `json:"update_last_run,omitempty"`

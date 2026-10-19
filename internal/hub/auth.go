@@ -26,7 +26,7 @@ func (h *Hub) NewSignin() string {
 }
 
 // redeemSignin uses up a sign-in token and starts a browser session.
-func (h *Hub) redeemSignin(token string) (cookie, csrf string, err error) {
+func (h *Hub) redeemSignin(token, agent string) (cookie, csrf string, err error) {
 	k := hashToken(token)
 	h.mu.Lock()
 	exp, ok := h.signins[k]
@@ -35,13 +35,7 @@ func (h *Hub) redeemSignin(token string) (cookie, csrf string, err error) {
 	if !ok || time.Now().After(exp) {
 		return "", "", errors.New("this sign-in link was already used or has expired; run `ember-fleet login-link` for a new one")
 	}
-	cookie, csrf = randToken(), randToken()
-	err = h.store.Update(func(s *State) error {
-		s.Sessions[hashToken(cookie)] = &BrowserSession{Hash: hashToken(cookie), CSRF: csrf,
-			Created: time.Now().UnixMilli(), Expires: time.Now().Add(sessionLife).UnixMilli()}
-		return nil
-	})
-	return cookie, csrf, err
+	return h.startSession(agent, "link")
 }
 
 func (h *Hub) session(cookie string) *BrowserSession {

@@ -1,0 +1,102 @@
+/* Sign-in page: the PIN box, and the switch between PIN and approval */
+.pin-form {
+  align-self: stretch;
+  display: grid;
+  gap: 8px;
+}
+.pin-form label {
+  font-size: 13px;
+  color: var(--muted);
+}
+.pin-row {
+  display: flex;
+  gap: 8px;
+}
+.pin-field {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+.pin-field input {
+  flex: 1;
+  padding-right: 42px;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+}
+.pin-field .icon-button {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.pin-form .hint,
+.pin-form .message-error {
+  margin: 0;
+}
+.gate-card .gate-switch {
+  margin-top: 4px;
+  font-size: 13px;
+  text-align: left;
+}
+
+/* Settings › Signing in */
+.signin-panel .pin-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+.badge.ok {
+  color: #4fd1c5;
+  border-color: rgb(79 209 197 / 0.4);
+}
+.pin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.pin-show code {
+  font-size: 20px;
+  letter-spacing: 0.14em;
+  color: #f4f7fb;
+}
+.signin-panel .subhead {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.4px;
+}
+
+/* The hub runs a newer build than this page */
+.page-stale {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px 10px 14px;
+  border-radius: 10px;
+  background: rgba(11, 16, 30, 0.96);
+  border: 1px solid rgba(244, 120, 83, 0.55);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  font-size: 13.5px;
+}
+.page-stale > svg {
+  color: var(--accent);
+  flex: none;
+}
+@media (max-width: 520px) {
+  .pin-row {
+    flex-direction: column;
+  }
+  .page-stale {
+    flex-wrap: wrap;
+  }
+}

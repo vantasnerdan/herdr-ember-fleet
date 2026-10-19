@@ -14,6 +14,8 @@ export interface Me {
   /** The hub's key fingerprint, short. */
   hub: string;
   version: string;
+  /** A sign-in PIN is set, so the sign-in page offers a PIN box. */
+  pin?: boolean;
 }
 
 export interface Machine {
@@ -120,13 +122,30 @@ export interface HerdrSnapshot {
 // ---------------------------------------------------------------- live updates
 
 export type LiveMessage =
-  | { type: "hello"; fleet: { machines: Machine[] }; groups?: Group[]; signinRequests?: SigninAsk[] }
+  | { type: "hello"; fleet: { machines: Machine[] }; groups?: Group[]; signinRequests?: SigninAsk[]; version?: string }
   | { type: "signin-requests"; requests: SigninAsk[] }
   | { type: "machine"; machine: Machine }
   | { type: "removed"; host?: string; id?: string }
   | { type: "groups"; groups: Group[] }
   | { type: "fleet"; name: string }
   | { type: "updates"; updates: UpdateStatus };
+
+/** The sign-in PIN: whether one is set, since when, and a new one once, when the hub made it. */
+export interface PinStatus {
+  set: boolean;
+  at: number;
+  pin?: string;
+}
+
+/** A signed-in browser, as settings lists them. */
+export interface BrowserSession {
+  id: string;
+  agent: string; // "Chrome on macOS"; empty for browsers signed in before names were kept
+  via?: "pin" | "approval" | "link";
+  created: number;
+  seen?: number;
+  current: boolean;
+}
 
 /** A browser asking to be signed in; the same code shows on both screens. */
 export interface SigninAsk {

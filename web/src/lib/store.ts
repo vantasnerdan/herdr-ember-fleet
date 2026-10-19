@@ -15,6 +15,10 @@ export const app = reactive({
   signinError: "",
   me: null as Me | null,
   live: "connecting" as LiveState,
+  /** Signed out: the hub has a sign-in PIN, so the sign-in page offers it. */
+  pinSignin: false,
+  /** The hub now runs a newer build than this page: offer a reload. */
+  newVersion: "",
   /** Fleet settings: which view is open, if any. */
   settings: null as null | "fleet" | "add",
   filter: "",
@@ -207,6 +211,8 @@ export function applyLive(msg: LiveMessage) {
     machines.value = byHost(msg.fleet.machines ?? []);
     if (msg.groups) groups.value = msg.groups;
     signinRequests.value = msg.signinRequests ?? [];
+    // The live feed reconnects after the hub restarts; a new build means this page is old.
+    if (msg.version && app.me?.version && msg.version !== app.me.version) app.newVersion = msg.version;
   } else if (msg.type === "groups") groups.value = msg.groups ?? [];
   else if (msg.type === "updates") updates.value = msg.updates;
   else if (msg.type === "signin-requests") signinRequests.value = msg.requests ?? [];
@@ -255,6 +261,7 @@ export async function boot() {
   if (app.phase === "signin-failed") return;
   try {
     const me = await api.me();
+    app.pinSignin = !!me.pin;
     if (!me.signedIn) return signedOut();
     setCsrf(me.csrf);
     app.me = me;

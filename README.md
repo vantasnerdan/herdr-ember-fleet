@@ -62,6 +62,8 @@ ember-fleet service install hub
 ember-fleet login-link                       # open the link it prints
 ```
 
+To sign in from other computers, make a **PIN**: `ember-fleet pin`, or **Settings › Signing in** on the page. Type it on the sign-in page of any browser that can reach the hub. It doesn't expire, and the browser stays signed in while it's used. With no PIN with you, a new browser shows a code and asks to be approved: a browser that is already signed in shows the same code with **Approve**. **Settings › Signing in** also lists the signed-in browsers, and you can sign any of them out.
+
 **4. Add machines.** Use **Add a machine** on the page, or:
 
 ```sh
@@ -124,7 +126,8 @@ From the hub's terminal: `ember-fleet update [DOCK-ID]` and `ember-fleet update-
 - **Traffic.** Every channel is TLS 1.3 between hub and dock, inside the relay's gRPC stream. The relay sees who talks to whom, when, and how much, but not what.
 - **Permissions** are enforced on each machine (`~/.config/ember-fleet/dock/dock.json`). Viewers can only watch. Typing into a terminal or using `attach` is full trust: it is that user's shell. Actions are an allow-list (prompt, keys, rename, close). Server control, plugins and integrations are never offered.
 - **Stale targets.** Terminals and actions are tied to the exact herdr server process the page last saw. If herdr restarted, they fail closed instead of reaching a new pane that happens to have the same ID.
-- **The page** needs sign-in even on `127.0.0.1`: a one-time sign-in link, an HttpOnly SameSite=Strict cookie, exact Host and Origin checks, and CSRF on every change, including WebSockets.
+- **The page** needs sign-in even on `127.0.0.1`: a one-time sign-in link, the PIN, or approval from a signed-in browser. Sessions are HttpOnly SameSite=Strict cookies, with exact Host and Origin checks and CSRF on every change, including WebSockets.
+- **The PIN** is meant as a second lock behind something that already guards the address (an SSO proxy, a VPN). It is stored as an Argon2id hash. Wrong PINs pause PIN sign-in for the whole hub after 5 tries in 15 minutes or 20 in a day.
 - **Audit.** Each dock logs who did what, when and to which pane in `~/.config/ember-fleet/dock/audit.jsonl`. It never logs keystrokes, screens or prompt text.
 
 ## Development

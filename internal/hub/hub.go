@@ -50,8 +50,10 @@ type Hub struct {
 	live     sync.Mutex
 	watchers map[*liveSub]struct{} // pages following the fleet
 
-	signins map[string]time.Time  // one-time sign-in token hashes
-	asks    map[string]*signinAsk // browsers asking to be approved
+	signins  map[string]time.Time  // one-time sign-in token hashes
+	asks     map[string]*signinAsk // browsers asking to be approved
+	pinMu    sync.Mutex            // one PIN check at a time
+	pinFails []time.Time           // wrong PINs in the last day
 
 	upd updater
 

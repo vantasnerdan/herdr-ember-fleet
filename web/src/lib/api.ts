@@ -2,7 +2,7 @@
 // from /api/me on every request that changes something. A 401 from anywhere means
 // the browser is signed out.
 
-import type { ActionRequest, ActionResult, Group, JoinLink, Machine, Me, Member, NewLink, Uploaded, UploadTarget, UpdateSettings, UpdateStatus, SigninAsk } from "./types";
+import type { ActionRequest, ActionResult, Group, JoinLink, Machine, Me, Member, NewLink, Uploaded, UploadTarget, UpdateSettings, UpdateStatus, SigninAsk, PinStatus, BrowserSession } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -144,7 +144,18 @@ export const api = {
       body: { id, poll },
       anonymous: true,
     }),
+  cancelSignin: (id: string, poll: string) =>
+    call<unknown>("POST", "/api/signin/cancel", { body: { id, poll }, anonymous: true }),
   signinRequests: () => call<{ requests: SigninAsk[] }>("GET", "/api/signin/requests"),
+
+  /** The sign-in PIN: typed on the sign-in page, it never expires. */
+  pinSignin: (pin: string) => call<{ csrf: string }>("POST", "/api/signin/pin", { body: { pin }, anonymous: true }),
+  pin: () => call<PinStatus>("GET", "/api/pin"),
+  /** No PIN given: the hub makes one and returns it, once. */
+  setPin: (pin = "") => call<PinStatus>("POST", "/api/pin", { body: { pin } }),
+  removePin: () => call<PinStatus>("DELETE", "/api/pin"),
+  sessions: () => call<{ sessions: BrowserSession[] }>("GET", "/api/sessions"),
+  endSession: (id: string) => call<unknown>("DELETE", `/api/sessions/${encodeURIComponent(id)}`),
   decideSignin: (id: string, approve: boolean) => call<unknown>("POST", "/api/signin/decide", { body: { id, approve } }),
 
   updates: () => call<UpdateStatus>("GET", "/api/updates"),

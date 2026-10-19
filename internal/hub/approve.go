@@ -169,16 +169,31 @@ func (h *Hub) collectAsk(id, poll string) (state, cookie, csrf string, err error
 	if state != "approved" {
 		return state, "", "", nil
 	}
-	cookie, csrf, err = h.startSession()
+	cookie, csrf, err = h.startSession(a.Agent, "approval")
 	return state, cookie, csrf, err
 }
 
+// cancelAsk withdraws a request; only the browser that asked can.
+func (h *Hub) cancelAsk(id, poll string) {
+	h.mu.Lock()
+	a := h.asks[id]
+	gone := a != nil && subtle.ConstantTimeCompare([]byte(a.PollHash), []byte(hashToken(poll))) == 1
+	if gone {
+		delete(h.asks, id)
+	}
+	h.mu.Unlock()
+	if gone {
+		h.signinsChanged()
+	}
+}
+
 // startSession creates a browser session and returns its cookie value and CSRF token.
-func (h *Hub) startSession() (cookie, csrf string, err error) {
+func (h *Hub) startSession(agent, via string) (cookie, csrf string, err error) {
 	cookie, csrf = randToken(), randToken()
+	now := time.Now()
 	err = h.store.Update(func(s *State) error {
-		s.Sessions[hashToken(cookie)] = &BrowserSession{Hash: hashToken(cookie), CSRF: csrf,
-			Created: time.Now().UnixMilli(), Expires: time.Now().Add(sessionLife).UnixMilli()}
+		s.Sessions[hashToken(cookie)] = &BrowserSession{Hash: hashToken(cookie), CSRF: csrf, Agent: agent, Via: via,
+			Created: now.UnixMilli(), Seen: now.UnixMilli(), Expires: now.Add(sessionLife).UnixMilli()}
 		return nil
 	})
 	return cookie, csrf, err
@@ -195,6 +210,7 @@ func (h *Hub) renewSession(hash string) (time.Time, bool) {
 		}
 		if time.Until(time.UnixMilli(bs.Expires)) < sessionLife-sessionRenewGap {
 			bs.Expires = time.Now().Add(sessionLife).UnixMilli()
+			bs.Seen = time.Now().UnixMilli()
 			renewed = true
 		}
 		exp = time.UnixMilli(bs.Expires)
@@ -246,6 +262,23 @@ func (w *Web) pollSignin(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOut(rw, map[string]any{"ok": true, "state": state})
+}
+
+func (w *Web) cancelSigninAsk(rw http.ResponseWriter, r *http.Request) {
+	if !w.originOK(r) {
+		jsonErr(rw, http.StatusForbidden, "bad origin")
+		return
+	}
+	var req struct {
+		ID   string `json:"id"`
+		Poll string `json:"poll"`
+	}
+	if readJSON(r, &req) != nil {
+		jsonErr(rw, http.StatusBadRequest, "bad request")
+		return
+	}
+	w.h.cancelAsk(req.ID, req.Poll)
+	jsonOut(rw, map[string]any{"ok": true})
 }
 
 func (w *Web) listAsks(rw http.ResponseWriter, r *http.Request, p principal) {

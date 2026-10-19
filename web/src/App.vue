@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watchEffect } from "vue";
+import { RefreshCw } from "@lucide/vue";
 import TopBar from "./components/TopBar.vue";
 import SigninRequests from "./components/SigninRequests.vue";
 import FleetSidebar from "./components/FleetSidebar.vue";
@@ -23,6 +24,8 @@ onMounted(() => {
   watchAlerts();
   void boot();
 });
+
+const reload = () => location.reload();
 
 const dragging = ref(false);
 function resize(e: PointerEvent) {
@@ -52,6 +55,10 @@ function resize(e: PointerEvent) {
   >
     <TopBar />
     <SigninRequests />
+    <div v-if="app.newVersion" class="page-stale" role="status">
+      <RefreshCw :size="16" /><span>The fleet hub was updated to {{ app.newVersion }}. Reload for the new page.</span>
+      <button class="primary small" @click="reload">Reload</button>
+    </div>
     <main class="fleet-main">
       <FleetSidebar />
       <div
