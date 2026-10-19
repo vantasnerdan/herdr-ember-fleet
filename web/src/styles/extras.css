@@ -1,0 +1,113 @@
+/* Marbell Ember: the rules that go with the effects (fx/vfx.ts).
+   Ported from Ember Fleet's extras.css. */
+
+/* Beacons: agent state in the two signal colours that appear nowhere else.
+   Working breathes slowly; blocked (waiting for you) gives two soft beats and
+   rests. vfx.ts adds the halo for the selectors in fx/brand.ts. */
+.beacon.working {
+  animation: ember-breathe 4.6s ease-in-out infinite;
+}
+.state-pill.beacon.working {
+  animation: none;
+}
+.state-pill.beacon.working i {
+  animation: ember-breathe 4.6s ease-in-out infinite;
+}
+.beacon.blocked {
+  animation: ember-beat 2.6s linear infinite;
+}
+.state-pill.beacon.blocked {
+  animation: none;
+}
+.state-pill.beacon.blocked i {
+  animation: ember-beat 2.6s linear infinite;
+}
+@keyframes ember-breathe {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes ember-beat {
+  0%,
+  4% {
+    opacity: 0.55;
+  }
+  10% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 0.6;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  40%,
+  100% {
+    opacity: 0.55;
+  }
+}
+
+/* Banked embers: a window without focus cools at once (less colour, a little
+   less light) and warms back up over 0.45 s when it takes focus again. */
+.ember-bank {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  -webkit-backdrop-filter: saturate(0.7) brightness(0.9);
+  backdrop-filter: saturate(0.7) brightness(0.9);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.45s ease-out,
+    visibility 0s linear 0.45s;
+}
+html.ember-banked .ember-bank {
+  opacity: 1;
+  visibility: visible;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beacon.working,
+  .beacon.blocked,
+  .state-pill.beacon i,
+  .connection.reconnecting i {
+    animation: none !important;
+  }
+  .ember-bank,
+  .toast {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Glass: the main panes let the plate behind them show through, the way the
+   terminal and herdr's sidebar sit over theirs. Only while the effects run; on a
+   phone the sidebar is the whole screen, and there it stays a little more solid. */
+html[data-ember-fx="on"] .topbar {
+  background: color-mix(in srgb, var(--ember-glass-high) 62%, transparent);
+}
+html[data-ember-fx="on"] .sidebar {
+  background: color-mix(in srgb, var(--ember-glass-high) 40%, transparent);
+}
+html[data-ember-fx="on"] .term-host {
+  background: color-mix(in srgb, var(--ember-glass) 55%, transparent);
+}
+html[data-ember-fx="on"] .pane-head,
+html[data-ember-fx="on"] .pane-foot,
+html[data-ember-fx="on"] .notice {
+  background: color-mix(in srgb, var(--ember-glass-high) 62%, transparent);
+}
+html[data-ember-fx="on"] .tree-row .mark .dot {
+  box-shadow: 0 0 0 2px #0a0f1d;
+}
+@media (max-width: 700px) {
+  html[data-ember-fx="on"] .sidebar {
+    background: color-mix(in srgb, var(--ember-glass-high) 55%, transparent);
+  }
+}

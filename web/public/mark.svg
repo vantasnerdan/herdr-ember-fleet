@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 5" role="img" aria-labelledby="title">
+  <title id="title">Ember Fleet</title>
+  <!-- A block E and F on the same 4-row grid as upstream's mark, and one coal that glows. -->
+  <defs>
+    <filter id="glow" x="-1.5" y="-1.5" width="4" height="4">
+      <feGaussianBlur stdDeviation="0.45"/>
+    </filter>
+  </defs>
+  <g fill="#F4F7FB" transform="translate(.5 .5)">
+    <path d="M0 0H3V1H2V2H1V3H3V4H0Z"/>
+    <path d="M4 0H7V1H6V2H5V4H4Z"/>
+  </g>
+  <rect x="7.5" y="3.5" width="1" height="1" fill="#F47853" opacity=".75" filter="url(#glow)"/>
+  <rect x="7.5" y="3.5" width="1" height="1" fill="#F47853"/>
+</svg>

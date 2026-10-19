@@ -1,0 +1,99 @@
+// The relay: the one reachable meeting point. It authenticates members by their
+// TLS client-certificate key, routes channels between a hub and its docks, and
+// never parses what flows through them (that is end-to-end TLS between hub and dock).
+syntax = "proto3";
+
+package ember.relay.v1;
+
+option go_package = "github.com/vantasnerdan/herdr-ember-fleet/internal/relay/relaypb";
+
+service Relay {
+  // Redeem a one-time ticket: the caller's client-certificate key becomes a
+  // member (a hub, or a dock belonging to the hub that issued the ticket).
+  rpc Enroll(EnrollRequest) returns (EnrollReply);
+
+  // Hub only: record a one-time dock ticket (by hash) for a join link.
+  rpc Invite(InviteRequest) returns (InviteReply);
+
+  // A dock's control line. The dock sends Hello first; the relay sends Open
+  // whenever a hub wants a channel, and the dock answers with Accept.
+  rpc Dock(stream DockUp) returns (stream DockDown);
+
+  // The dock's half of a channel. Metadata "ember-channel" names it.
+  rpc Accept(stream Chunk) returns (stream Chunk);
+
+  // The hub's half of a channel. Metadata "ember-dock" names the dock.
+  rpc Open(stream Chunk) returns (stream Chunk);
+
+  // Hub only: the hub's docks, sent again whenever anything changes.
+  rpc Directory(DirectoryRequest) returns (stream DirectorySnapshot);
+
+  // Hub only: forget a dock's key and cut its live channels.
+  rpc Revoke(RevokeRequest) returns (RevokeReply);
+}
+
+message EnrollRequest {
+  bytes ticket = 1;
+}
+
+message EnrollReply {
+  string role = 1;      // "hub" or "dock"
+  string member_id = 2; // the caller's key fingerprint
+}
+
+message InviteRequest {
+  bytes ticket_hash = 1; // SHA-256 of the ticket; the relay never sees the link's secret
+  string link_id = 2;
+  string name = 3;
+  int64 expires_unix_ms = 4;
+}
+
+message InviteReply {}
+
+message DockUp {
+  oneof msg {
+    Hello hello = 1;
+  }
+}
+
+message Hello {
+  string version = 1; // ember-fleet version, shown in the directory
+}
+
+message DockDown {
+  oneof msg {
+    OpenChannel open = 1;
+  }
+}
+
+message OpenChannel {
+  string channel_id = 1;
+}
+
+// Bytes in one direction. eof marks the end of this direction (half-close).
+message Chunk {
+  bytes data = 1;
+  bool eof = 2;
+}
+
+message DirectoryRequest {}
+
+message DirectorySnapshot {
+  repeated DockEntry docks = 1;
+}
+
+message DockEntry {
+  string id = 1;      // key fingerprint
+  string link_id = 2; // the link it enrolled with (a hint; the hub verifies pairing itself)
+  string name = 3;
+  bool online = 4;
+  int64 since_unix_ms = 5;     // online since, or enrolled at
+  int64 last_seen_unix_ms = 6;
+  string version = 7;
+}
+
+message RevokeRequest {
+  string dock_id = 1;
+}
+
+message RevokeReply {}

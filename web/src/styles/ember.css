@@ -1,0 +1,548 @@
+/* Marbell Ember: navy glass, Space Mono, coral as the only thing that glows.
+   Values from Ember Fleet's web UI (ember-fleet/palette.mjs and its remapped sheets). */
+
+:root {
+  --ember-black: #000000;
+  --ember-well: #03060e; /* backdrops, the deepest recess */
+  --ember-glass: #070b16; /* page background */
+  --ember-glass-high: #0b1120; /* bars that sit on the glass */
+  --ember-panel: #111829; /* panels and cards */
+  --ember-raised: #141c2f; /* dialogs */
+  --ember-line: #1e2a44; /* borders, rules */
+  --ember-line-high: #2c3955;
+  --ember-select: #26365a; /* selection, active rows */
+  --ember-dim: #687a9d; /* comments, punctuation */
+  --ember-label: #7c8baa; /* labels and meta text */
+  --ember-soft: #c0cadc; /* tree text */
+  --ember-text: #c9d3e3;
+  --ember-bright: #f4f7fb;
+  --ember-coral: #f47853;
+  --ember-teal: #4fd1c5;
+  --ember-amber: #f2b866;
+  --ember-red: #e5484d;
+  --ember-blue: #6e9bf5;
+  --ember-violet: #9db8ff;
+  /* Agent state only, nowhere else: working breathes, blocked beats. */
+  --ember-working: #ffb52e;
+  --ember-blocked: #ff2e7e;
+  /* The faint halo ember-glass.glsl draws around coral, as a text shadow. */
+  --ember-halo: 0 0 9px rgb(244 120 83 / 0.5);
+  --ember-face: "Space Mono", ui-monospace, monospace;
+
+  --accent: var(--ember-coral);
+  --muted: var(--ember-label);
+  --line: var(--ember-line);
+
+  color-scheme: dark;
+  font-family: var(--ember-face);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ember-text);
+  background: var(--ember-glass);
+  font-synthesis: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+::selection {
+  background: var(--ember-select);
+  color: var(--ember-bright);
+}
+h1,
+h2,
+h3,
+strong {
+  color: var(--ember-bright);
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+code,
+kbd,
+pre {
+  font-family: var(--ember-face);
+}
+svg {
+  flex-shrink: 0;
+}
+a {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- controls */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: none;
+  color: inherit;
+  border: 0;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+button:not(:disabled):hover {
+  filter: brightness(1.13);
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+input,
+textarea,
+select {
+  color: inherit;
+  background: #070c17;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  outline: none;
+  min-width: 0;
+  caret-color: var(--ember-coral);
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #556c9a;
+  box-shadow: 0 0 0 2px rgb(110 155 245 / 0.06);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--ember-dim);
+  opacity: 1;
+}
+textarea {
+  resize: none;
+  line-height: 1.5;
+}
+
+.primary {
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--ember-glass);
+  border: 1px solid var(--accent);
+  font-weight: 700;
+  border-radius: 7px;
+  box-shadow: var(--ember-halo);
+  white-space: nowrap;
+}
+.primary:disabled {
+  opacity: 1;
+  background: transparent;
+  border-color: var(--ember-line-high);
+  color: var(--ember-dim);
+  box-shadow: none;
+}
+.secondary {
+  padding: 8px 12px;
+  background: #182238;
+  border: 1px solid var(--ember-line-high);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.small {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 4px;
+  color: var(--muted);
+  border-radius: 6px;
+  flex: none;
+}
+.icon-button:not(:disabled):hover {
+  background: rgb(244 247 251 / 0.04);
+  color: var(--ember-text);
+}
+.icon-button.on {
+  color: var(--accent);
+}
+.text-button {
+  padding: 0;
+  color: var(--accent);
+  text-shadow: var(--ember-halo);
+}
+.danger-text {
+  color: var(--ember-red);
+}
+.secondary.danger-text {
+  border-color: rgb(229 72 77 / 0.35);
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hint {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.muted {
+  color: var(--muted);
+}
+code.inline,
+.hint code,
+p code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgb(110 155 245 / 0.08);
+  border: 1px solid var(--line);
+  font-size: 0.92em;
+  color: var(--ember-text);
+  overflow-wrap: anywhere;
+}
+kbd {
+  padding: 0 5px;
+  border-radius: 4px;
+  border: 1px solid var(--ember-line-high);
+  font-size: 0.85em;
+}
+
+/* ---------------------------------------------------------------- dots and state pills */
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  background: #516388;
+}
+.dot.on {
+  background: var(--ember-teal);
+  box-shadow: 0 0 6px rgb(79 209 197 / 0.4);
+}
+.dot.off {
+  background: #3e4d6b;
+}
+.dot.err {
+  background: var(--ember-red);
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--ember-line);
+  color: var(--ember-label);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  flex: none;
+}
+.state-pill i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.state-pill.working {
+  color: var(--ember-working);
+  background: rgb(255 181 46 / 0.1);
+}
+.state-pill.blocked {
+  color: var(--ember-blocked);
+  background: rgb(255 46 126 / 0.1);
+}
+.state-pill.done {
+  color: var(--ember-teal);
+  background: rgb(79 209 197 / 0.08);
+}
+.state-pill.unknown {
+  color: var(--ember-dim);
+}
+.state-pill.offline {
+  color: var(--ember-dim);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+/* A row's state as a dot. */
+.sdot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--ember-select);
+}
+.sdot.working {
+  background: var(--ember-working);
+}
+.sdot.blocked {
+  background: var(--ember-blocked);
+}
+.sdot.done {
+  background: var(--ember-teal);
+}
+.sdot.idle {
+  background: #3e4d6b;
+}
+
+/* Harness monograms: one per agent kind, tinted, never glowing. */
+.harness {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--ember-soft);
+  background: var(--ember-panel);
+  border: 1px solid var(--ember-line-high);
+}
+.harness[data-h="claude"] {
+  color: #ff9a7b;
+  border-color: rgb(244 120 83 / 0.4);
+  background: rgb(244 120 83 / 0.08);
+}
+.harness[data-h="codex"] {
+  color: var(--ember-bright);
+  border-color: rgb(244 247 251 / 0.25);
+}
+.harness[data-h="grok"] {
+  color: #d6dbe6;
+  background: #0d1220;
+}
+.harness[data-h="gemini"] {
+  color: var(--ember-blue);
+  border-color: rgb(110 155 245 / 0.4);
+  background: rgb(110 155 245 / 0.08);
+}
+.harness[data-h="omp"],
+.harness[data-h="pi"] {
+  color: var(--ember-violet);
+  border-color: rgb(157 184 255 / 0.35);
+  background: rgb(157 184 255 / 0.07);
+}
+.harness[data-h="opencode"],
+.harness[data-h="amp"] {
+  color: var(--ember-amber);
+  border-color: rgb(242 184 102 / 0.35);
+  background: rgb(242 184 102 / 0.07);
+}
+.harness[data-h="cursor"],
+.harness[data-h="copilot"] {
+  color: var(--ember-teal);
+  border-color: rgb(79 209 197 / 0.35);
+  background: rgb(79 209 197 / 0.06);
+}
+.harness.shell {
+  color: var(--ember-dim);
+  background: transparent;
+  border-style: dashed;
+}
+
+/* ---------------------------------------------------------------- dialogs */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(3 6 14 / 0.74);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+}
+.modal {
+  width: 460px;
+  max-width: 100%;
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 26px 28px;
+  background: var(--ember-raised);
+  border: 1px solid #344465;
+  border-radius: 13px;
+  box-shadow: 0 30px 100px rgb(0 0 0 / 0.45);
+  scrollbar-width: thin;
+  scrollbar-color: #2a3957 transparent;
+}
+.modal > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.modal > header h2 {
+  margin-top: 6px;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+}
+.modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 13.5px;
+  color: var(--ember-text);
+}
+.modal input,
+.modal select {
+  width: 100%;
+  padding: 11px 12px;
+}
+.modal > footer,
+.modal form > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.modal .body-text {
+  line-height: 1.6;
+  font-size: 14px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.link-preview {
+  display: block;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #060a15;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  color: var(--ember-bright);
+}
+.primary.danger {
+  background: var(--ember-red);
+  border-color: var(--ember-red);
+  color: var(--ember-bright);
+  box-shadow: none;
+}
+a.primary {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.message-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  border: 1px solid rgb(229 72 77 / 0.4);
+  background: rgb(229 72 77 / 0.07);
+  color: #f2b7b9;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- toasts */
+.toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(440px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px 11px 14px;
+  border-radius: 9px;
+  background: var(--ember-raised);
+  border: 1px solid #344465;
+  box-shadow: 0 16px 50px rgb(0 0 0 / 0.45);
+  font-size: 13.5px;
+  line-height: 1.5;
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+}
+.toast > span {
+  flex: 1;
+  padding-top: 2px;
+}
+.toast.ok {
+  border-color: rgb(79 209 197 / 0.4);
+}
+.toast.warn {
+  border-color: rgb(242 184 102 / 0.5);
+  color: #f6dcb3;
+}
+.toast.error {
+  border-color: rgb(229 72 77 / 0.5);
+  color: #f2b7b9;
+}
+.toast .icon-button {
+  width: 24px;
+  height: 24px;
+}
+@keyframes toast-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- copy rows */
+.copy-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 6px;
+}
+.copy-row code {
+  flex: 1;
+  display: block;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #060a15;
+  border: 1px solid #232f4a;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: all;
+  -webkit-user-select: all;
+  color: var(--ember-bright);
+}
+.copy-row .icon-button {
+  height: auto;
+  min-height: 30px;
+  border: 1px solid var(--line);
+}

@@ -1,0 +1,390 @@
+/* The pane view: its header, the live terminal, the key buttons and the prompt bar. */
+
+.pane-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------- header */
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: rgb(11 17 32 / 0.85);
+}
+.pane-head .back {
+  display: none;
+}
+.pane-head .harness {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-size: 13.5px;
+}
+.pane-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.crumbs > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.crumbs > span.host {
+  color: var(--ember-text);
+  flex: none;
+}
+.crumbs .slash {
+  color: var(--ember-dim);
+  flex: none;
+}
+.pane-title h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.pane-title h1 .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-title h1 .harness-name {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pane-title .screen-title {
+  font-size: 12.5px;
+  color: var(--ember-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mode-badge.control {
+  color: var(--accent);
+  border-color: rgb(244 120 83 / 0.55);
+  text-shadow: var(--ember-halo);
+  box-shadow: 0 0 10px rgb(244 120 83 / 0.18);
+}
+.mode-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ---------------------------------------------------------------- menus */
+.menu-wrap {
+  position: relative;
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 210px;
+  padding: 5px;
+  border-radius: 9px;
+  background: var(--ember-raised);
+  border: 1px solid #344465;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.5);
+  display: flex;
+  flex-direction: column;
+}
+.menu button {
+  justify-content: flex-start;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  text-align: left;
+}
+.menu button:not(:disabled):hover {
+  background: rgb(244 247 251 / 0.05);
+}
+.menu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 2px;
+}
+
+/* ---------------------------------------------------------------- notices */
+.notices {
+  display: flex;
+  flex-direction: column;
+}
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 18px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+  background: rgb(11 17 32 / 0.85);
+}
+.notice > span {
+  flex: 1;
+  min-width: 0;
+}
+.notice.warn {
+  color: #f6dcb3;
+  background: color-mix(in srgb, var(--ember-amber) 7%, var(--ember-glass-high));
+}
+.notice.warn > svg {
+  color: var(--ember-amber);
+}
+.notice.info > svg {
+  color: var(--ember-blue);
+}
+.notice.blocked {
+  color: #ffc2d8;
+  background: color-mix(in srgb, var(--ember-blocked) 6%, var(--ember-glass-high));
+}
+.notice.blocked > svg {
+  color: var(--ember-blocked);
+}
+
+/* ---------------------------------------------------------------- terminal */
+.term-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+.term-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgb(7 11 22 / 0.72);
+  transition: box-shadow 0.2s;
+}
+.term-host.control {
+  box-shadow: inset 0 0 0 1px rgb(244 120 83 / 0.5), inset 0 0 24px rgb(244 120 83 / 0.07);
+}
+.term-frame {
+  flex: none;
+  transform-origin: center center;
+}
+.term-frame .xterm {
+  padding: 0;
+}
+.term-frame .xterm .xterm-viewport {
+  background: transparent !important;
+  overflow: hidden;
+}
+.term-frame .xterm .xterm-screen {
+  cursor: default;
+}
+.term-host.control .term-frame .xterm .xterm-screen {
+  cursor: text;
+}
+.term-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: rgb(7 11 22 / 0.78);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.term-overlay h2 {
+  font-size: 17px;
+}
+.term-overlay p {
+  max-width: 460px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.term-overlay.faint {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+.term-status {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: rgb(7 11 22 / 0.8);
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- footer: keys and prompt */
+.pane-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px 12px 18px;
+  border-top: 1px solid var(--line);
+  background: rgb(11 17 32 / 0.85);
+}
+.keybar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.keybar .key {
+  min-width: 46px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--ember-line-high);
+  border-bottom-width: 2px;
+  background: #0f1626;
+  font-size: 12.5px;
+  color: var(--ember-text);
+  white-space: nowrap;
+}
+.keybar .key:not(:disabled):active {
+  transform: translateY(1px);
+  border-bottom-width: 1px;
+}
+.keybar .why {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prompt-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.prompt-bar textarea {
+  flex: 1;
+  min-height: 42px;
+  max-height: 180px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: rgb(3 6 14 / 0.6);
+}
+.prompt-bar .primary {
+  height: 42px;
+}
+.prompt-warn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #ffc2d8;
+}
+.prompt-warn > svg {
+  color: var(--ember-blocked);
+}
+.prompt-hint {
+  font-size: 11.5px;
+  color: var(--ember-dim);
+}
+
+/* ---------------------------------------------------------------- phone */
+@media (max-width: 700px) {
+  .pane-head {
+    gap: 10px;
+    padding: 8px 8px 8px 6px;
+    flex-wrap: wrap;
+  }
+  .pane-head .back {
+    display: inline-flex;
+  }
+  .pane-head .harness {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  .pane-title h1 {
+    font-size: 15px;
+  }
+  .pane-title .screen-title {
+    display: none;
+  }
+  .pane-actions {
+    width: 100%;
+    order: 3;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .pane-actions .fit .label {
+    display: none;
+  }
+  .pane-actions .mode-badge {
+    margin-right: auto;
+  }
+  .term-host {
+    padding: 6px;
+  }
+  .pane-foot {
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  }
+  .keybar .key {
+    min-width: 50px;
+    padding: 7px 10px;
+  }
+  .keybar .why,
+  .prompt-hint {
+    display: none;
+  }
+  .notice {
+    padding: 8px 10px;
+  }
+}

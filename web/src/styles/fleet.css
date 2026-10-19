@@ -1,0 +1,555 @@
+/* The shell, the top bar, the sidebar with "Needs you" and the fleet tree. */
+
+.app-shell {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- top bar */
+.topbar {
+  height: 56px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ember-glass-high);
+  z-index: 10;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.brandmark {
+  display: block;
+  width: 40px;
+  height: 22px;
+  flex: none;
+}
+.brand strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+}
+.brand .sep {
+  color: var(--ember-dim);
+}
+.brand .fleet-name {
+  color: var(--ember-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.needs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 11px;
+  border: 1px solid rgb(255 46 126 / 0.45);
+  border-radius: 999px;
+  color: var(--ember-blocked);
+  background: rgb(255 46 126 / 0.07);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.connection i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #516388;
+}
+.connection.live i {
+  background: var(--accent);
+  box-shadow: 0 0 7px rgb(244 120 83 / 0.6);
+}
+.connection.reconnecting {
+  color: var(--ember-amber);
+}
+.connection.reconnecting i {
+  background: var(--ember-amber);
+  animation: ember-breathe 1.4s ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------- the split */
+.fleet-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+.sidebar {
+  width: var(--sidebar-w, 340px);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: #090e1b;
+}
+.resizer {
+  flex: 0 0 6px;
+  width: 6px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 5;
+}
+.resizer:hover,
+.resizer.dragging {
+  background: rgb(244 120 83 / 0.2);
+}
+.stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------- sidebar head and filter */
+.tree-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 10px 6px 16px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+}
+.tree-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.tree-filter {
+  position: relative;
+  margin: 4px 10px 6px;
+}
+.tree-filter input {
+  width: 100%;
+  padding: 7px 30px 7px 32px;
+  font-size: 13px;
+  background: rgb(3 6 14 / 0.5);
+}
+.tree-filter > svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ember-dim);
+  pointer-events: none;
+}
+.tree-filter .icon-button {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+}
+
+/* ---------------------------------------------------------------- the tree */
+.tree-list {
+  flex: 1;
+  overflow: auto;
+  padding: 2px 6px 16px;
+  outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: #2a3957 transparent;
+}
+.tree-list:focus-visible {
+  box-shadow: inset 0 0 0 1px #556c9a;
+}
+.tree-empty {
+  padding: 14px 12px;
+}
+.tree-row {
+  --depth: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 3px 8px 3px calc(4px + var(--depth) * 16px);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ember-soft);
+  font-size: 14px;
+  white-space: nowrap;
+  user-select: none;
+}
+.tree-row:hover {
+  background: rgb(244 247 251 / 0.03);
+}
+.tree-row.focus {
+  box-shadow: inset 0 0 0 1px #465980;
+}
+.tree-row.sel {
+  background: rgb(244 120 83 / 0.08);
+}
+.tree-row.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: var(--ember-halo);
+}
+.tree-row.offline {
+  opacity: 0.55;
+}
+/* Depth guides: a faint line under each open level helps read deep trees. */
+.tree-row:not(.machine)::after {
+  content: "";
+  position: absolute;
+  left: calc(4px + var(--depth) * 16px - 8px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgb(244 247 251 / 0.05);
+  pointer-events: none;
+}
+.tree-row .chev {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  color: var(--muted);
+}
+.tree-row span.chev {
+  display: inline-block;
+}
+.tree-row .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-row .ico {
+  color: var(--muted);
+  flex: none;
+}
+.tree-row .meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.tree-row .meta.err {
+  color: #e96e6c;
+}
+.tree-row .right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding-left: 6px;
+}
+.tree-row .count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tree-row .count.blocked {
+  color: var(--ember-blocked);
+}
+.tree-row .count.working {
+  color: var(--ember-working);
+}
+
+/* machine: two lines, the device and its state */
+.tree-row.machine,
+.tree-row.dock {
+  min-height: 46px;
+  margin-top: 4px;
+}
+.tree-row.machine:first-child {
+  margin-top: 0;
+}
+.tree-row .mark {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+.tree-row .mark .dot {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  flex-basis: 8px;
+  box-shadow: 0 0 0 2px #090e1b;
+}
+.tree-row .two {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.tree-row .two > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.tree-row.machine .name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ember-bright);
+}
+.tree-row.dock .name {
+  font-weight: 700;
+}
+.tree-row .badge {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--ember-line-high);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+/* workspace and tab */
+.tree-row.workspace .name {
+  font-weight: 700;
+}
+.tree-row.tab .name {
+  color: var(--ember-text);
+}
+
+/* pane: the agent, its state, what its screen says */
+.tree-row.pane {
+  min-height: 44px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.tree-row.pane .two .name {
+  color: var(--ember-text);
+  font-weight: 700;
+}
+.tree-row.pane.shell .two .name {
+  font-weight: 400;
+  color: var(--ember-label);
+}
+.tree-row.pane .sub {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-row.pane .sub .cwd {
+  color: var(--ember-dim);
+}
+
+/* ---------------------------------------------------------------- needs you */
+.needs {
+  margin: 6px 8px 6px;
+  border: 1px solid rgb(255 46 126 / 0.3);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ember-blocked) 4%, rgb(9 14 27 / 0.85));
+  overflow: hidden;
+}
+.needs.calm {
+  border-color: var(--line);
+  background: rgb(9 14 27 / 0.6);
+}
+.needs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 6px 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  color: var(--ember-blocked);
+}
+.needs.calm .needs-head {
+  color: var(--muted);
+}
+.needs-head .title {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.needs-head .calm-text {
+  flex: 1;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-size: 12.5px;
+}
+.needs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 4px;
+  max-height: 34dvh;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.needs-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  text-align: left;
+  justify-content: flex-start;
+}
+.needs-item:hover {
+  background: rgb(255 46 126 / 0.06);
+}
+.needs-item.sel {
+  background: rgb(244 120 83 / 0.1);
+}
+.needs-item .sdot {
+  margin-top: 6px;
+}
+.needs-item {
+  padding: 6px 8px;
+}
+.needs-item .what {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.needs-item .line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.needs-item .where {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.needs-item .who {
+  flex: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ember-bright);
+  white-space: nowrap;
+}
+.needs-item .q {
+  font-size: 12px;
+  color: var(--ember-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.done-list > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 4px 12px 7px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.done-list > summary::-webkit-details-marker {
+  display: none;
+}
+.done-list .needs-item .who {
+  font-weight: 400;
+  color: var(--ember-text);
+}
+.done-list .needs-item:hover {
+  background: rgb(79 209 197 / 0.05);
+}
+
+/* ---------------------------------------------------------------- phone: one screen at a time */
+@media (max-width: 700px) {
+  .topbar {
+    height: 52px;
+    min-height: 52px;
+    padding: 0 8px 0 12px;
+    gap: 8px;
+  }
+  .brand {
+    gap: 9px;
+  }
+  .brand strong,
+  .brand .sep,
+  .summary-pill,
+  .connection .label {
+    display: none;
+  }
+  .resizer {
+    display: none;
+  }
+  .sidebar {
+    width: 100%;
+    border-right: 0;
+  }
+  .app-shell.has-pane .sidebar {
+    display: none;
+  }
+  .app-shell:not(.has-pane) .stage {
+    display: none;
+  }
+  .tree-row {
+    min-height: 40px;
+  }
+  .tree-row.pane {
+    min-height: 50px;
+  }
+  .needs-list {
+    max-height: 40dvh;
+  }
+}
