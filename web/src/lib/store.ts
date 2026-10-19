@@ -3,7 +3,7 @@
 
 import { computed, reactive, ref, shallowRef } from "vue";
 import { api, ApiError, errorText, setCsrf, whenFleetRenamed, whenSignedOut } from "./api";
-import { allPanes, buildTree, parseRefKey, pathTo, refKey, type PaneInfo, type PaneRef } from "./fleet";
+import { allPanes, buildTree, parseRefKey, refKey, type PaneInfo, type PaneRef } from "./fleet";
 import type { Group, LiveMessage, Machine, Me } from "./types";
 import { connectLive } from "./live";
 
@@ -55,13 +55,25 @@ export function save(key: string, value: unknown) {
   }
 }
 
-/** Tree rows the viewer folded. Everything starts open. */
+/**
+ * Which tree rows are open. Machine rows start folded, so the machine list
+ * stays compact and opens only where the viewer clicks; what's inside a
+ * machine, and groups (how the viewer gets to agents), start open.
+ */
 export const collapsed = reactive(new Set<string>(load<string[]>("ember.collapsed", [])));
-export const isOpen = (key: string) => !collapsed.has(key);
+export const expanded = reactive(new Set<string>(load<string[]>("ember.expanded", [])));
+const startsFolded = (key: string) => key.startsWith("m:");
+export const isOpen = (key: string) => (startsFolded(key) ? expanded.has(key) : !collapsed.has(key));
 export function setOpen(key: string, open: boolean) {
-  if (open) collapsed.delete(key);
-  else collapsed.add(key);
-  save("ember.collapsed", [...collapsed]);
+  if (startsFolded(key)) {
+    if (open) expanded.add(key);
+    else expanded.delete(key);
+    save("ember.expanded", [...expanded]);
+  } else {
+    if (open) collapsed.delete(key);
+    else collapsed.add(key);
+    save("ember.collapsed", [...collapsed]);
+  }
 }
 
 export const sidebarWidth = ref(load<number>("ember.sidebar", 372));
@@ -83,7 +95,8 @@ function keyFromHash(): string | null {
 
 export function openPane(ref: PaneRef) {
   const key = refKey(ref);
-  for (const k of pathTo(tree.value, `p:${key}`)) if (collapsed.has(k)) setOpen(k, true);
+  // Opening a pane never unfolds the machine tree; the viewer folds and
+  // unfolds machines by hand.
   if (selectedKey.value === key) return;
   history.pushState({ ember: true }, "", `${location.pathname}${location.search}#/p/${key}`);
   selectedKey.value = key;
