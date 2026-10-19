@@ -37,6 +37,7 @@ type paneInfo struct {
 	Terminal string
 	Cols     int
 	Rows     int
+	Status   string // the agent's state, when the pane runs one
 }
 
 // Sessions follows every herdr session of this OS user.
@@ -345,6 +346,7 @@ type snapView struct {
 	Panes []struct {
 		PaneID     string `json:"pane_id"`
 		TerminalID string `json:"terminal_id"`
+		Status     string `json:"agent_status"`
 		Scroll     struct {
 			ViewportRows int `json:"viewport_rows"`
 		} `json:"scroll"`
@@ -374,7 +376,7 @@ func (s *Sessions) publish(name string, peer herdr.Peer, snap json.RawMessage) [
 	var ids []string
 	for _, p := range v.Panes {
 		ids = append(ids, p.PaneID)
-		info := paneInfo{Terminal: p.TerminalID}
+		info := paneInfo{Terminal: p.TerminalID, Status: p.Status}
 		if r, ok := rects[p.PaneID]; ok {
 			// The real terminal is viewport_rows tall; borders take the same
 			// amount from the width as from the height (measured on herdr 0.9.3).

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/vantasnerdan/herdr-ember-fleet/internal/e2e"
@@ -155,6 +156,10 @@ func (d *Dock) action(ctx context.Context, c *chanCtx) {
 
 	actx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	if c.h.Method == "agent.prompt" && needsSettle(params["text"].(string)) {
+		d.promptSettled(actx, c, st, params["target"].(string), params["text"].(string))
+		return
+	}
 	conn, err := herdr.Dial(actx, c.h.Session)
 	if err != nil {
 		c.fail("offline", "herdr is not reachable; nothing was sent")
@@ -235,4 +240,93 @@ func (d *Dock) endpoint(ctx context.Context, c *chanCtx) {
 	}
 	cancel()
 	cmd.Wait()
+}
+
+// needsSettle says a prompt needs the slow path: agents turn pasted
+// attachment paths into attachments (Claude Code's "[Image #1]") and long
+// pastes into placeholders, and that can take longer than the 300 ms herdr's
+// agent.prompt waits before Enter. The Enter then gets lost.
+func needsSettle(text string) bool {
+	return strings.Contains(text, UploadDir()) || strings.Contains(text, "\n") || len(text) > 800
+}
+
+// promptSettled pastes the prompt (bracketed, so newlines don't submit), waits
+// until the bottom of the agent's screen stops changing, then presses Enter
+// once. Every step checks that herdr is still the server the hub saw.
+func (d *Dock) promptSettled(ctx context.Context, c *chanCtx, st SessionState, pane, text string) {
+	if info, ok := st.index[pane]; ok && info.Status == "blocked" {
+		c.fail("agent_blocked", "the agent is waiting on a question; nothing was sent")
+		return
+	}
+	call := func(method string, params any) (json.RawMessage, *herdr.Error, error, bool) {
+		conn, err := herdr.Dial(ctx, c.h.Session)
+		if err != nil {
+			return nil, nil, err, false
+		}
+		defer conn.Close()
+		if conn.Peer.Epoch() != c.h.Epoch {
+			d.sessions.Poke(c.h.Session)
+			return nil, nil, errors.New("herdr restarted"), false
+		}
+		if _, err := conn.Request(method, params); err != nil {
+			return nil, nil, err, true
+		}
+		res, herr, err := conn.Read(15 * time.Second)
+		return res, herr, err, true
+	}
+	unknown := func(msg string) {
+		d.audit.log(c, "action", "outcome unknown: "+msg)
+		e2e.WriteJSON(c.conn, e2e.Reply{Code: "unknown", Error: msg, Outcome: "unknown"})
+	}
+
+	_, herr, err, sent := call("pane.send_input", map[string]any{"pane_id": pane, "text": text})
+	switch {
+	case err != nil && !sent:
+		c.fail("stale", "herdr is not reachable or restarted; nothing was sent")
+		return
+	case err != nil:
+		unknown("the connection to herdr broke while pasting the prompt")
+		return
+	case herr != nil:
+		c.fail(herr.Code, herr.Message)
+		return
+	}
+
+	// Wait for the paste to be taken in: the screen's bottom lines unchanged
+	// for two reads in a row, after at least ~1 s, at most 4 s (a busy
+	// agent's spinner never settles, so it gets the full wait).
+	start := time.Now()
+	var last string
+	same := 0
+	time.Sleep(400 * time.Millisecond)
+	for time.Since(start) < 4*time.Second {
+		res, herr, err, _ := call("pane.read", map[string]any{"pane_id": pane, "source": "visible", "lines": 12})
+		if err != nil || herr != nil {
+			break
+		}
+		if string(res) == last {
+			same++
+		} else {
+			same = 0
+		}
+		last = string(res)
+		if same >= 2 && time.Since(start) >= time.Second {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	_, herr, err, sent = call("pane.send_keys", map[string]any{"pane_id": pane, "keys": []string{"enter"}})
+	d.sessions.Poke(c.h.Session)
+	switch {
+	case err != nil && !sent:
+		unknown("the prompt was pasted, but herdr went away before Enter; check the screen")
+	case err != nil:
+		unknown("the prompt was pasted, and the connection broke while pressing Enter; check the screen")
+	case herr != nil:
+		unknown("the prompt was pasted, but Enter failed (" + herr.Message + "); press Enter")
+	default:
+		d.audit.log(c, "action", "ok (pasted, settled, entered)")
+		e2e.WriteJSON(c.conn, e2e.Reply{OK: true, Result: json.RawMessage(`{"type":"agent_prompted"}`)})
+	}
 }
