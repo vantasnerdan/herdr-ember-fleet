@@ -34,7 +34,7 @@ var (
 	groupColors = map[string]bool{"": true, "ember": true, "amber": true, "rose": true, "teal": true, "sky": true, "violet": true, "slate": true}
 	fpRE        = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 	sessRE      = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
-	paneIDRE    = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}:p[0-9]{1,6}$`)
+	paneIDRE    = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}:p[A-Za-z0-9]{1,12}$`)
 )
 
 func cleanGroupName(s string) (string, error) {

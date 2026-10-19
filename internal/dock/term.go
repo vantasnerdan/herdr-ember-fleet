@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	paneRE      = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}:p[0-9]{1,6}$`)
-	tabRE       = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}:t[0-9]{1,6}$`)
+	// herdr numbers panes and tabs with letters as well as digits (w2:pC, wK:t1).
+	paneRE      = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}:p[A-Za-z0-9]{1,12}$`)
+	tabRE       = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}:t[A-Za-z0-9]{1,12}$`)
 	workspaceRE = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
 	terminalRE  = regexp.MustCompile(`^term_[A-Za-z0-9]{1,64}$`)
 )

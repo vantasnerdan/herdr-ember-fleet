@@ -53,6 +53,14 @@ func TestActionsAllowList(t *testing.T) {
 			t.Errorf("agent.prompt accepted %s", bad)
 		}
 	}
+	for _, id := range []string{"w2:pC", "wK:p1", "w10:pZz9"} { // herdr IDs use letters too
+		if _, err := build("pane.close", `{"pane_id":"`+id+`"}`); err != nil {
+			t.Errorf("pane id %s refused: %v", id, err)
+		}
+	}
+	if _, err := build("tab.close", `{"tab_id":"wK:tB"}`); err != nil {
+		t.Errorf("tab id with a letter refused: %v", err)
+	}
 	if _, err := build("pane.send_keys", `{"pane_id":"w1:p1","keys":["ctrl+c","esc","enter"]}`); err != nil {
 		t.Errorf("send_keys: %v", err)
 	}

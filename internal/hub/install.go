@@ -77,6 +77,14 @@ mv "$tmp" "$bin/ember-fleet"
 if ! command -v herdr >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/herdr" ] && [ ! -x /opt/homebrew/bin/herdr ] && [ ! -x /usr/local/bin/herdr ]; then
   echo "Note: herdr is not installed yet. Install it with: curl -fsSL https://herdr.dev/install.sh | sh"
 fi
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/ember-fleet/dock/dock.json"
+if [ -f "$conf" ]; then
+  # Already in a fleet: this run is an update. Restart the dock on the new binary.
+  echo "This user already belongs to a fleet; updating ember-fleet and restarting the dock ..."
+  "$bin/ember-fleet" service install dock
+  "$bin/ember-fleet" version
+  exit 0
+fi
 if [ -r /dev/tty ]; then
   "$bin/ember-fleet" join < /dev/tty
 else
