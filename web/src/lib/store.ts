@@ -197,16 +197,20 @@ function fleetRenamed(name: string) {
 }
 whenFleetRenamed(fleetRenamed);
 
+const byHost = (list: Machine[]) => [...list].sort((a, b) => a.host.localeCompare(b.host));
+
 export function applyLive(msg: LiveMessage) {
   if (msg.type === "hello") {
-    machines.value = msg.fleet.machines ?? [];
+    machines.value = byHost(msg.fleet.machines ?? []);
     if (msg.groups) groups.value = msg.groups;
   } else if (msg.type === "groups") groups.value = msg.groups ?? [];
   else if (msg.type === "updates") updates.value = msg.updates;
   else if (msg.type === "fleet") fleetRenamed(msg.name);
   else if (msg.type === "machine") {
+    // Replace in place and keep the order stable (by name): appending moved
+    // whichever machine last reported to the end of every list.
     const list = machines.value.filter((m) => m.host !== msg.machine.host);
-    machines.value = msg.machine.docks.length ? [...list, msg.machine] : list;
+    machines.value = byHost(msg.machine.docks.length ? [...list, msg.machine] : list);
   } else if (msg.type === "removed") {
     const host = msg.host ?? msg.id;
     machines.value = machines.value.filter((m) => m.host !== host && !m.docks.some((d) => d.id === host));
@@ -216,7 +220,7 @@ export function applyLive(msg: LiveMessage) {
 /** Re-reads the whole fleet, for when a live update may have been missed. */
 export async function refreshFleet() {
   try {
-    machines.value = (await api.fleet()).machines ?? [];
+    machines.value = byHost((await api.fleet()).machines ?? []);
   } catch {
     // the live channel will catch up
   }
@@ -249,7 +253,7 @@ export async function boot() {
     if (!me.signedIn) return signedOut();
     setCsrf(me.csrf);
     app.me = me;
-    machines.value = (await api.fleet()).machines ?? [];
+    machines.value = byHost((await api.fleet()).machines ?? []);
     groups.value = await loadGroups();
     app.phase = "ready";
     stopLive?.();
