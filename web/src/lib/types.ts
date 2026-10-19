@@ -28,8 +28,10 @@ export interface Dock {
   user: string;
   os: string;
   arch: string;
-  /** herdr version */
+  /** installed herdr version */
   herdr: string;
+  /** the running herdr server's version (default session) */
+  herdrServer?: string;
   online: boolean;
   /** unix ms */
   lastSeen: number;
@@ -141,6 +143,7 @@ export interface UpdateResult {
   herdrTo?: string;
   servers?: string; // "default=0.9.5 work=0.9.5"
   error?: string;
+  output?: string; // the tail of herdr update's output
 }
 export interface UpdateDock {
   id: string;

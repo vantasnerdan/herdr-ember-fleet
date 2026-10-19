@@ -566,7 +566,8 @@ type DockView struct {
 	Home     string            `json:"home"`
 	OS       string            `json:"os"`
 	Arch     string            `json:"arch"`
-	Herdr    string            `json:"herdr"`
+	Herdr    string            `json:"herdr"`       // installed herdr
+	HerdrRun string            `json:"herdrServer"` // the default session's running herdr server
 	Version  string            `json:"version"`
 	Online   bool              `json:"online"`
 	LastSeen int64             `json:"lastSeen"`
@@ -609,6 +610,16 @@ func (h *Hub) Machines() []Machine {
 			})
 			for _, n := range names {
 				v.Sessions = append(v.Sessions, sessionView(d.sessions[n], d.online))
+			}
+			if raw, ok := d.sessions["default"]; ok {
+				var s struct {
+					Snapshot struct {
+						Version string `json:"version"`
+					} `json:"snapshot"`
+				}
+				if json.Unmarshal(raw, &s) == nil {
+					v.HerdrRun = s.Snapshot.Version
+				}
 			}
 		}
 		m := by[rec.Name]

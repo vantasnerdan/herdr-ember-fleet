@@ -238,6 +238,9 @@ func run(ctx context.Context, cmd string, args []string) error {
 			if r := d.Result; r != nil {
 				if r.Error != "" {
 					line += "  last: " + r.Error
+					if r.Output != "" {
+						line += "\n      " + strings.ReplaceAll(strings.TrimSpace(r.Output), "\n", "\n      ")
+					}
 				} else {
 					line += "  last: ok " + time.UnixMilli(r.At).Format("Jan 2 15:04")
 				}

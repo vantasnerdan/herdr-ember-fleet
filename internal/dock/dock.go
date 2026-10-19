@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vantasnerdan/herdr-ember-fleet/internal/e2e"
@@ -262,7 +263,7 @@ func (d *Dock) info(ctx context.Context, role string) Info {
 	}
 	home, _ := os.UserHomeDir()
 	return Info{Type: "info", Name: d.cfg.Name, Host: host, User: name, Home: home, OS: runtime.GOOS, Arch: runtime.GOARCH,
-		Herdr: herdr.Version(ctx), Version: Version, Role: role}
+		Herdr: installedHerdr(ctx), Version: Version, Role: role}
 }
 
 // watch sends this dock's info, then each session's state whenever it changes.
@@ -270,7 +271,8 @@ func (d *Dock) watch(ctx context.Context, c *chanCtx) {
 	if c.ok() != nil {
 		return
 	}
-	if e2e.WriteJSON(c.conn, d.info(ctx, c.grant.Role)) != nil {
+	info := d.info(ctx, c.grant.Role)
+	if e2e.WriteJSON(c.conn, info) != nil {
 		return
 	}
 	wake, stop := d.sessions.Subscribe()
@@ -288,6 +290,14 @@ func (d *Dock) watch(ctx context.Context, c *chanCtx) {
 		case <-closed:
 			return
 		case <-ping.C:
+			// herdr may have been updated (by the fleet or by hand): resend the
+			// info when its version changes, so the page never shows a stale one.
+			if now := d.info(ctx, c.grant.Role); now.Herdr != info.Herdr {
+				info = now
+				if e2e.WriteJSON(c.conn, info) != nil {
+					return
+				}
+			}
 			if e2e.WriteJSON(c.conn, map[string]string{"type": "ping"}) != nil {
 				return
 			}
@@ -366,4 +376,21 @@ func trunc(s string, n int) string {
 		return s[:n]
 	}
 	return s
+}
+
+type cachedVersion struct {
+	v  string
+	at time.Time
+}
+
+var herdrVersionCache atomic.Pointer[cachedVersion]
+
+// installedHerdr is the installed herdr's version, re-read at most every 15 s.
+func installedHerdr(ctx context.Context) string {
+	if c := herdrVersionCache.Load(); c != nil && time.Since(c.at) < 15*time.Second {
+		return c.v
+	}
+	v := herdr.Version(ctx)
+	herdrVersionCache.Store(&cachedVersion{v: v, at: time.Now()})
+	return v
 }

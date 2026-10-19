@@ -138,16 +138,23 @@ func (d *Dock) herdrUpdate(ctx context.Context, c *chanCtx) {
 	}
 	res.Output = tail(out.String(), 2000)
 	res.After = herdr.Version(ctx)
+	herdrVersionCache.Store(nil) // the next info message reports the new version
 	// Give a handed-off server a moment, then report what is actually running.
 	time.Sleep(3 * time.Second)
 	for _, s := range herdr.Sessions() {
-		if snap, _, err := readSnapshot(ctx, s); err == nil {
-			var v struct {
-				Version string `json:"version"`
+		v := serverVersion(ctx, s)
+		// `herdr update` hands off only when it installs something. A server
+		// left on an older version than the installed herdr (installed earlier
+		// by hand, say) is handed off to the installed binary here, the same
+		// way herdr's updater does it. On any failure herdr rolls back and
+		// the old server keeps running with its panes.
+		if c.h.Handoff && res.After != "" && v != "" && v != res.After {
+			if err := handoff(ctx, s, bin, res.After); err != nil {
+				res.Output = tail(res.Output+"\nhandoff of "+s+" to "+res.After+": "+err.Error(), 2000)
 			}
-			json.Unmarshal(snap, &v)
-			res.Servers += s + "=" + v.Version + " "
+			v = serverVersion(ctx, s)
 		}
+		res.Servers += s + "=" + v + " "
 		d.sessions.Poke(s)
 	}
 	res.Servers = strings.TrimSpace(res.Servers)
@@ -160,4 +167,35 @@ func tail(s string, n int) string {
 		return "…" + s[len(s)-n:]
 	}
 	return s
+}
+
+func serverVersion(ctx context.Context, session string) string {
+	snap, _, err := readSnapshot(ctx, session)
+	if err != nil {
+		return ""
+	}
+	var v struct {
+		Version string `json:"version"`
+	}
+	json.Unmarshal(snap, &v)
+	return v.Version
+}
+
+// handoff asks a running server to hand its panes to the installed herdr,
+// then waits until the server answering on the socket reports that version.
+func handoff(ctx context.Context, session, bin, version string) error {
+	hctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	_, _, err := herdr.Call(hctx, session, "server.live_handoff", map[string]any{"import_exe": bin, "expected_version": version})
+	if err != nil {
+		return err
+	}
+	deadline := time.Now().Add(60 * time.Second)
+	for time.Now().Before(deadline) {
+		time.Sleep(2 * time.Second)
+		if serverVersion(hctx, session) == version {
+			return nil
+		}
+	}
+	return fmt.Errorf("the server did not come back on %s within 60 s", version)
 }

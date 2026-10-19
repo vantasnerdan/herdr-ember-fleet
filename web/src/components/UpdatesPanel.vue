@@ -131,6 +131,10 @@ function resultLine(d: UpdateDock): string {
             >
             <small :class="{ warn: d.herdrServer && d.herdr && d.herdrServer !== d.herdr }">{{ herdrLine(d) }}</small>
             <small v-if="d.result" :class="{ 'danger-text': d.result.error }">{{ resultLine(d) }}</small>
+            <details v-if="d.result?.error && d.result.output" class="update-output">
+              <summary>herdr's output</summary>
+              <pre>{{ d.result.output }}</pre>
+            </details>
           </div>
         </li>
       </ul>

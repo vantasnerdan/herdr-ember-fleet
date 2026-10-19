@@ -54,7 +54,9 @@ const dockMeta = computed(() => {
   const c = n.value.counts;
   const parts = [c.agents ? plural(c.agents, "agent") : "no agents"];
   if (c.shells) parts.push(plural(c.shells, "shell"));
-  if (d.herdr) parts.push(`herdr ${d.herdr}`);
+  // what's running matters most; note the installed version when it's newer
+  const run = d.herdrServer || d.herdr;
+  if (run) parts.push(d.herdrServer && d.herdr && d.herdr !== d.herdrServer ? `herdr ${run} (${d.herdr} installed)` : `herdr ${run}`);
   return parts.join(" · ");
 });
 

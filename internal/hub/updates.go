@@ -38,6 +38,7 @@ type UpdateResult struct {
 	HerdrTo   string `json:"herdrTo,omitempty"`
 	Servers   string `json:"servers,omitempty"` // running herdr servers afterwards, "name=version ..."
 	Error     string `json:"error,omitempty"`
+	Output    string `json:"output,omitempty"` // the tail of herdr update's output
 }
 
 // By default herdr is updated without live handoff: running servers (and the
@@ -194,7 +195,7 @@ func (h *Hub) updateDock(ctx context.Context, id string, u UpdateSettings) Updat
 	}
 	if u.Herdr {
 		r, err := h.updateHerdr(ctx, id, u.Handoff)
-		res.HerdrFrom, res.HerdrTo, res.Servers = r.Before, r.After, r.Servers
+		res.HerdrFrom, res.HerdrTo, res.Servers, res.Output = r.Before, r.After, r.Servers, r.Output
 		if err != nil {
 			res.Error = "herdr: " + err.Error()
 		}
