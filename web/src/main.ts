@@ -12,6 +12,7 @@ import "./styles/groups.css";
 import "./styles/attach.css";
 import "./styles/updates.css";
 import "./styles/signin.css";
+import "./styles/pages.css";
 
 import { createApp } from "vue";
 import App from "./App.vue";

@@ -212,6 +212,9 @@ func (w *Web) auth(next authed) http.HandlerFunc {
 			return
 		}
 		p := principal{kind: "browser", name: "owner", csrf: s.CSRF, cred: "session:" + s.Hash, expires: time.UnixMilli(s.Expires)}
+		if s.Agent == "" {
+			w.h.nameSession(s.Hash, browserName(r.UserAgent()))
+		}
 		// Sessions slide: in use, they don't run out (renewed at most daily).
 		if time.Until(p.expires) < sessionLife-sessionRenewGap {
 			if exp, renewed := w.h.renewSession(s.Hash); renewed {

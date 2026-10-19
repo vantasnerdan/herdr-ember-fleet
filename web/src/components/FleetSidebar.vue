@@ -1,19 +1,21 @@
 <script setup lang="ts">
-// The sidebar: "Needs you", then the viewer's groups (Physics, Coding, Burst…), then every
-// machine, its users, herdr sessions, workspaces, tabs and panes.
+// The sidebar: "Needs you", then the fleet in one of two views, so each agent shows once:
+//   Groups    the viewer's groups (Physics, Coding, Burst…), then what is in no group
+//   Machines  every machine, its users, herdr sessions, workspaces, tabs and panes
+// Plain shells hide unless the viewer shows them.
 //
 // Arrow keys walk the tree; Enter opens a pane or folds a row; M (or the context-menu key)
 // opens "Move to group…" for the focused agent or machine user, F2 renames a group.
 // With a mouse, agents and machine users drag into groups, members drag to reorder or out
 // to the machines to leave their group, and group headers drag to reorder groups.
 import { computed, nextTick, ref, watch } from "vue";
-import { ArrowDown, ArrowUp, FolderPlus, LogOut, Network, Pencil, Plus, Search, Trash2, X } from "@lucide/vue";
+import { ArrowDown, ArrowUp, FolderPlus, LogOut, Network, Pencil, Plus, Search, SquareTerminal, Trash2, X } from "@lucide/vue";
 import FleetRow from "./FleetRow.vue";
 import GroupRow from "./GroupRow.vue";
 import GroupDialog from "./GroupDialog.vue";
 import NeedsYou from "./NeedsYou.vue";
 import RowMenu, { type MenuItem } from "./RowMenu.vue";
-import { filterTree, flatten, type Row, type TreeNode } from "../lib/fleet";
+import { filterTree, flatten, isShellRow, prune, type Row, type TreeNode } from "../lib/fleet";
 import {
   colorHex,
   createGroup,
@@ -28,25 +30,34 @@ import {
   reorderGroups,
   updateGroup,
 } from "../lib/groups";
-import { app, confirmAsk, groups, isOpen, load, machines, openPane, save, selectedKey, setOpen, tree } from "../lib/store";
+import { app, confirmAsk, groups, isOpen, machines, openPane, selectedKey, setOpen, showShells, tree, treeView } from "../lib/store";
 import type { Group, Member } from "../lib/types";
 
 // ---------------------------------------------------------------- what is shown
 
-const view = ref<"all" | "groups">(load("ember.view", "all"));
-watch(view, (v) => save("ember.view", v));
-const showMachines = computed(() => view.value === "all" || !groups.value.length);
+const view = treeView;
+const shells = showShells;
+const byGroup = computed(() => view.value === "groups");
 
 const filtering = computed(() => !!app.filter.trim());
 const openRow = (n: TreeNode) => filtering.value || isOpen(n.key);
-const groupRows = computed(() => flatten(filterTree(groupTree.value, app.filter), openRow));
-const machineRows = computed(() => (showMachines.value ? flatten(filterTree(tree.value, app.filter), openRow) : []));
+const hideShells = (list: TreeNode[]) => (shells.value ? list : prune(list, isShellRow));
+const groupRows = computed(() =>
+  byGroup.value ? flatten(filterTree(hideShells(groupTree.value), app.filter), openRow) : [],
+);
+/** In the Groups view, only what is in no group; in the Machines view, everything. */
+const machineTree = computed(() => {
+  const all = byGroup.value ? prune(tree.value, (n) => !!groupOfNode(n)) : tree.value;
+  return hideShells(all);
+});
+const machineRows = computed(() => flatten(filterTree(machineTree.value, app.filter), openRow));
+const shellCount = computed(() => tree.value.reduce((n, m) => n + m.counts.shells, 0));
 const rows = computed(() => [...groupRows.value, ...machineRows.value]);
 const rowByKey = computed(() => new Map(rows.value.map((r) => [r.node.key, r])));
 
 const isSelected = (n: TreeNode) => n.kind === "pane" && !!n.pane && n.pane.key === selectedKey.value;
-/** In the machine tree, a grouped agent or machine user wears its group's name. */
-const tagOf = (n: TreeNode) => (n.inGroup ? undefined : groupOfNode(n));
+/** In the Machines view, a grouped agent or machine user wears its group's name. */
+const tagOf = (n: TreeNode) => (n.inGroup || byGroup.value ? undefined : groupOfNode(n));
 const movable = (n: TreeNode) => !!memberOf(n);
 
 const focusKey = ref<string>();
@@ -331,8 +342,10 @@ const rowId = (key: string) => `row-${key.replace(/[^a-zA-Z0-9_-]/g, (c) => `_${
 watch(selectedKey, (key) => {
   if (!key) return;
   void nextTick(() => {
-    const row = machineRows.value.find((r) => isSelected(r.node)) ?? groupRows.value.find((r) => isSelected(r.node));
-    if (row) list.value?.querySelector(`[data-key="${CSS.escape(row.node.key)}"]`)?.scrollIntoView({ block: "nearest" });
+    const row = rows.value.find((r) => isSelected(r.node));
+    if (!row) return;
+    focusKey.value = row.node.key; // the keyboard carries on from the open pane
+    list.value?.querySelector(`[data-key="${CSS.escape(row.node.key)}"]`)?.scrollIntoView({ block: "nearest" });
   });
 });
 </script>
@@ -342,7 +355,7 @@ watch(selectedKey, (key) => {
     <NeedsYou />
     <header class="tree-head">
       <span><Network :size="15" />AGENTS &amp; MACHINES</span>
-      <button class="icon-button" title="Add a machine" aria-label="Add a machine" @click="app.settings = 'add'">
+      <button class="icon-button" title="Add a machine" aria-label="Add a machine" @click="app.adding = true">
         <Plus :size="17" />
       </button>
     </header>
@@ -363,9 +376,20 @@ watch(selectedKey, (key) => {
           <X :size="14" />
         </button>
       </div>
-      <div v-if="groups.length" class="view-toggle" role="group" aria-label="Show">
-        <button :aria-pressed="view === 'all'" @click="view = 'all'">All</button>
-        <button :aria-pressed="view === 'groups'" @click="view = 'groups'">Groups only</button>
+      <div class="tree-switches">
+        <div class="view-toggle" role="group" aria-label="Arrange by">
+          <button :aria-pressed="view === 'groups'" @click="view = 'groups'">Groups</button>
+          <button :aria-pressed="view === 'machines'" @click="view = 'machines'">Machines</button>
+        </div>
+        <button
+          v-if="shellCount"
+          class="shell-toggle"
+          :aria-pressed="shells"
+          :title="shells ? 'Hide plain shells' : 'Show plain shells too'"
+          @click="shells = !shells"
+        >
+          <SquareTerminal :size="14" />{{ shells ? "Shells shown" : `${shellCount} shell${shellCount === 1 ? "" : "s"} hidden` }}
+        </button>
       </div>
     </div>
     <div
@@ -384,7 +408,7 @@ watch(selectedKey, (key) => {
       @drop="onDrop"
       @dragend="endDrag"
     >
-      <section class="groups-section" role="group" aria-label="Groups">
+      <section v-if="byGroup" class="groups-section" role="group" aria-label="Groups">
         <div class="section-head">
           <span>Groups</span>
           <button
@@ -454,13 +478,12 @@ watch(selectedKey, (key) => {
       </section>
 
       <section
-        v-if="showMachines"
         class="machines-section"
         :class="{ 'drop-ungroup': dropAt?.kind === 'ungroup' }"
         role="group"
-        aria-label="Machines"
+        :aria-label="byGroup && groups.length ? 'Not in a group' : 'Machines'"
       >
-        <div class="section-head"><span>Machines</span></div>
+        <div class="section-head"><span>{{ byGroup && groups.length ? "Not in a group" : "Machines" }}</span></div>
         <FleetRow
           v-for="row in machineRows"
           :id="rowId(row.node.key)"
@@ -479,9 +502,10 @@ watch(selectedKey, (key) => {
         />
         <p v-if="!machines.length" class="hint tree-empty">
           No machines yet.
-          <button class="text-button" @click="app.settings = 'add'">Add your first machine</button>
+          <button class="text-button" @click="app.adding = true">Add your first machine</button>
         </p>
-        <p v-else-if="!machineRows.length" class="hint tree-empty">Nothing matches “{{ app.filter }}”.</p>
+        <p v-else-if="!machineRows.length && filtering" class="hint tree-empty">Nothing matches “{{ app.filter }}”.</p>
+        <p v-else-if="!machineRows.length" class="hint tree-empty">Every agent is in a group.</p>
       </section>
     </div>
 

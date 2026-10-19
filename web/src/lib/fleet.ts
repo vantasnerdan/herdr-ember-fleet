@@ -41,7 +41,7 @@ export function rollup(states: Iterable<AgentStatus>): AgentStatus | undefined {
 export const STATUS_TEXT: Record<AgentStatus, string> = {
   working: "working",
   idle: "idle",
-  blocked: "blocked",
+  blocked: "needs you",
   done: "done",
   unknown: "unknown",
 };
@@ -115,6 +115,16 @@ export function ago(ms: number, now = Date.now()): string {
   return `${Math.round(h / 24)} d ago`;
 }
 
+/** How long since a time, as a duration: "12 min", "3 h". */
+export function lasted(ms: number, now = Date.now()): string {
+  const m = Math.max(0, Math.round((now - ms) / 60_000));
+  if (m < 1) return "under a minute";
+  if (m < 60) return `${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} h`;
+  return `${Math.round(h / 24)} d`;
+}
+
 export const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
 // ---------------------------------------------------------------- panes
@@ -152,8 +162,16 @@ export interface PaneInfo {
   /** The harness name herdr reports, lowercased; undefined for a plain shell. */
   harness?: string;
   status: AgentStatus;
-  /** What the row calls it: its label, else its harness, else "shell". */
+  /** Its label, else its harness, else "shell". */
   name: string;
+  /** What rows show: the name, plus its task when another pane of the same user shares the name. */
+  label: string;
+  /** Where it lives, readable and stable: host/user[/session]/pane, for links. */
+  addr: string;
+  /** When its current state began (unix ms), or 0 if not seen since the hub started. */
+  since: number;
+  /** The real pane's size, when herdr's layout says. */
+  size?: { cols: number; rows: number };
   title: string;
   /** cwd with ~ for the dock user's home */
   cwd: string;
@@ -161,9 +179,57 @@ export interface PaneInfo {
   online: boolean;
 }
 
-function paneInfo(host: string, dock: Dock, session: Session, snap: HerdrSnapshot, pane: HerdrPane): PaneInfo {
+/** A short description of what a pane is doing: its title, else its folder. */
+export function taskOf(name: string, title: string, cwd: string, paneId: string): string {
+  const t = title.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+  if (t && t.toLowerCase() !== name.toLowerCase()) return t.length > 42 ? `${t.slice(0, 40).trimEnd()}…` : t;
+  const folder = cwd.split("/").filter(Boolean).at(-1);
+  return folder && folder !== "~" ? folder : paneId;
+}
+
+/** Names that more than one pane of this machine user shares (three "Codex"). */
+function sharedNames(dock: Dock): Set<string> {
+  const seen = new Map<string, number>();
+  for (const s of dock.sessions)
+    for (const p of s.snapshot?.panes ?? []) {
+      const harness = p.agent?.toLowerCase();
+      if (!harness) continue;
+      const n = p.label || (harnessOf(harness)?.name ?? harness);
+      seen.set(n, (seen.get(n) ?? 0) + 1);
+    }
+  return new Set([...seen].filter(([, c]) => c > 1).map(([n]) => n));
+}
+
+/** The real pane's size: viewport_rows tall; borders take as much from the width (as the dock reckons it). */
+function realSize(snap: HerdrSnapshot, pane: HerdrPane): { cols: number; rows: number } | undefined {
+  for (const l of snap.layouts ?? [])
+    for (const p of l.panes ?? [])
+      if (p.pane_id === pane.pane_id && p.rect?.width && p.rect?.height) {
+        let rows = pane.scroll?.viewport_rows ?? 0;
+        if (rows <= 0 || rows > p.rect.height) rows = p.rect.height;
+        return { cols: Math.max(10, p.rect.width - (p.rect.height - rows)), rows: Math.max(3, rows) };
+      }
+  return undefined;
+}
+
+/** One part of a readable address: escaped, but herdr's "w2:pC" keeps its colon. */
+export const addrPart = (s: string) => encodeURIComponent(s).replace(/%3A/gi, ":");
+export const addrOf = (host: string, user: string, session: string, pane: string) =>
+  [host, user, ...(session === "default" ? [] : [session]), pane].map(addrPart).join("/");
+
+function paneInfo(
+  host: string,
+  dock: Dock,
+  session: Session,
+  snap: HerdrSnapshot,
+  pane: HerdrPane,
+  shared: Set<string>,
+): PaneInfo {
   const ref = { dock: dock.id, session: session.name, pane: pane.pane_id };
   const harness = pane.agent ? pane.agent.toLowerCase() : undefined;
+  const name = pane.label || (harness ? (harnessOf(harness)?.name ?? harness) : "shell");
+  const title = pane.terminal_title_stripped ?? pane.terminal_title ?? "";
+  const cwd = tildePath(pane.cwd || pane.foreground_cwd, dock);
   return {
     key: refKey(ref),
     ref,
@@ -175,9 +241,13 @@ function paneInfo(host: string, dock: Dock, session: Session, snap: HerdrSnapsho
     pane,
     harness,
     status: harness ? statusOf(pane.agent_status) : "unknown",
-    name: pane.label || (harness ? (harnessOf(harness)?.name ?? harness) : "shell"),
-    title: pane.terminal_title_stripped ?? pane.terminal_title ?? "",
-    cwd: tildePath(pane.cwd || pane.foreground_cwd, dock),
+    name,
+    label: harness && shared.has(name) ? `${name} · ${taskOf(name, title, cwd, pane.pane_id)}` : name,
+    addr: addrOf(host, dock.user, session.name, pane.pane_id),
+    since: session.since?.[pane.pane_id] ?? 0,
+    size: realSize(snap, pane),
+    title,
+    cwd,
     online: dock.online && session.online,
   };
 }
@@ -196,12 +266,14 @@ function orderPanes(snap: HerdrSnapshot, panes: HerdrPane[]): HerdrPane[] {
 export function allPanes(machines: readonly Machine[]): PaneInfo[] {
   const out: PaneInfo[] = [];
   for (const m of machines)
-    for (const d of m.docks)
+    for (const d of m.docks) {
+      const shared = sharedNames(d);
       for (const s of d.sessions) {
         const snap = s.snapshot;
         if (!snap) continue;
-        for (const p of snap.panes ?? []) out.push(paneInfo(m.host, d, s, snap, p));
+        for (const p of snap.panes ?? []) out.push(paneInfo(m.host, d, s, snap, p, shared));
       }
+    }
   return out;
 }
 
@@ -282,12 +354,12 @@ export function paneNode(info: PaneInfo): TreeNode {
   return {
     key: `p:${info.key}`,
     kind: "pane",
-    label: info.name,
+    label: info.label,
     children: [],
     online: info.online,
     status: info.harness ? info.status : undefined,
     counts,
-    text: [info.name, info.harness, info.title, info.cwd, info.harness ? info.status : "shell"].join(" "),
+    text: [info.label, info.harness, info.title, info.cwd, info.harness ? info.status : "shell"].join(" "),
     host: info.host,
     dock: info.dock,
     session: info.session,
@@ -310,12 +382,13 @@ function workspacesOf(host: string, dock: Dock, s: Session): TreeNode[] {
   if (!snap) return [];
   const online = dock.online && s.online;
   const base = sessionKey(dock, s);
+  const shared = sharedNames(dock);
   const workspaces = [...(snap.workspaces ?? [])].sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
   return workspaces.map((w) => {
     const panes = orderPanes(
       snap,
       (snap.panes ?? []).filter((p) => p.workspace_id === w.workspace_id),
-    ).map((p) => paneNode(paneInfo(host, dock, s, snap, p)));
+    ).map((p) => paneNode(paneInfo(host, dock, s, snap, p, shared)));
     const tabs = [...(snap.tabs ?? [])]
       .filter((t) => t.workspace_id === w.workspace_id)
       .sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
@@ -444,6 +517,32 @@ export function buildTree(machines: readonly Machine[]): TreeNode[] {
     });
 }
 
+/**
+ * The tree without the rows `drop` picks. Containers left empty go too, except machines,
+ * machine users and groups, which stay (a machine with no agents is still a machine).
+ */
+export function prune(nodes: TreeNode[], drop: (n: TreeNode) => boolean): TreeNode[] {
+  const out: TreeNode[] = [];
+  for (const n of nodes) {
+    if (drop(n)) continue;
+    if (!n.children.length) {
+      out.push(n);
+      continue;
+    }
+    const kids = prune(n.children, drop);
+    if (kids.length === n.children.length && kids.every((k, i) => k === n.children[i])) {
+      out.push(n);
+      continue;
+    }
+    if (!kids.length && n.kind !== "machine" && n.kind !== "dock" && n.kind !== "group") continue;
+    out.push(container({ ...n, children: kids }));
+  }
+  return out;
+}
+
+/** A plain shell's row (not one put in a group by hand). */
+export const isShellRow = (n: TreeNode) => n.kind === "pane" && !n.pane?.harness && !n.member;
+
 /** Keeps rows that match every word, with their ancestors; a matching container keeps all it holds. */
 export function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -495,4 +594,16 @@ export function pathTo(nodes: TreeNode[], key: string): string[] {
     return false;
   };
   return walk(nodes) ? trail : [];
+}
+
+/** Compares dotted versions ("0.9.10" > "0.9.5"); anything unreadable sorts first. */
+export function versionCmp(a?: string, b?: string): number {
+  const parts = (v?: string) => (v ?? "").replace(/^v/, "").split(/[.+-]/).map((x) => parseInt(x, 10));
+  const x = parts(a);
+  const y = parts(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (Number.isNaN(x[i]) ? -1 : (x[i] ?? 0)) - (Number.isNaN(y[i]) ? -1 : (y[i] ?? 0));
+    if (d) return d;
+  }
+  return 0;
 }

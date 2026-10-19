@@ -122,7 +122,9 @@ All JSON. Cookie auth with an exact `Origin` check; `X-Ember-CSRF` on every non-
 | `POST /api/docks/{id}/rename {name}` | display name |
 | `POST /api/tokens` | a terminal access token, shown once |
 
-A `Machine` groups docks by host: `{host, docks:[{id, name, user, os, herdr, online, lastSeen, role, sessions:[{name, epoch, online, error, snapshot}]}]}`. Here `snapshot` is herdr's own `session.snapshot` result: workspaces, tabs, panes, agents and layouts.
+A `Machine` groups docks by host: `{host, docks:[{id, name, user, os, herdr, herdrServer, version, online, lastSeen, role, sessions:[{name, epoch, online, error, snapshot, since}]}]}`. Here `snapshot` is herdr's own `session.snapshot` result: workspaces, tabs, panes, agents and layouts. `since` maps pane IDs to when each agent's current state began (unix ms), for the agents whose state the hub has seen change since it started.
+
+The page's addresses: none (overview), `#/a/<host>/<user>[/<session>]/<pane>` (an agent; the older `#/p/<dock>/<session>/<pane>` still opens), `#/agents[/<state>]`, `#/machines[/<host>]`, `#/settings[/<section>]`.
 
 ## Scripts
 

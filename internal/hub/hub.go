@@ -69,6 +69,7 @@ type dockLive struct {
 	version  string
 	info     *dockInfo
 	sessions map[string]json.RawMessage
+	since    map[string]map[string]paneSince // session → pane → when its state began
 	ctx      context.Context
 	cancel   context.CancelFunc
 	watching bool
@@ -507,6 +508,7 @@ func (h *Hub) watchOnce(dock string, b *relay.Backoff) error {
 			if d := h.docks[dock]; d != nil {
 				if _, ok := d.sessions[m.Name]; ok || len(d.sessions) < maxSessionsPerDock {
 					d.sessions[m.Name] = append(json.RawMessage(nil), line...)
+					d.noteStatuses(m.Name, line)
 				}
 			}
 			h.mu.Unlock()
@@ -519,6 +521,7 @@ func (h *Hub) watchOnce(dock string, b *relay.Backoff) error {
 			h.mu.Lock()
 			if d := h.docks[dock]; d != nil {
 				delete(d.sessions, m.Name)
+				delete(d.since, m.Name)
 			}
 			h.mu.Unlock()
 			h.changed(dock)
@@ -528,6 +531,10 @@ func (h *Hub) watchOnce(dock string, b *relay.Backoff) error {
 				h.mu.Lock()
 				if d := h.docks[dock]; d != nil {
 					d.sessions = fresh
+					d.keepSessions(fresh)
+					for name, l := range fresh {
+						d.noteStatuses(name, l)
+					}
 				}
 				h.mu.Unlock()
 				h.changed(dock)
@@ -613,7 +620,7 @@ func (h *Hub) Machines() []Machine {
 				return names[i] < names[j]
 			})
 			for _, n := range names {
-				v.Sessions = append(v.Sessions, sessionView(d.sessions[n], d.online))
+				v.Sessions = append(v.Sessions, sessionView(d.sessions[n], d.online, d.since[n]))
 			}
 			if raw, ok := d.sessions["default"]; ok {
 				var s struct {
@@ -645,7 +652,7 @@ func (h *Hub) Machines() []Machine {
 
 // sessionView passes the dock's session line through, minus the "type" key,
 // and marks it offline when the dock is.
-func sessionView(line json.RawMessage, online bool) json.RawMessage {
+func sessionView(line json.RawMessage, online bool, since map[string]paneSince) json.RawMessage {
 	var m map[string]json.RawMessage
 	if json.Unmarshal(line, &m) != nil {
 		return json.RawMessage(`{}`)
@@ -653,6 +660,9 @@ func sessionView(line json.RawMessage, online bool) json.RawMessage {
 	delete(m, "type")
 	if !online {
 		m["online"] = json.RawMessage("false")
+	}
+	if s := sinceView(since); len(s) > 0 {
+		m["since"], _ = json.Marshal(s)
 	}
 	b, _ := json.Marshal(m)
 	return b

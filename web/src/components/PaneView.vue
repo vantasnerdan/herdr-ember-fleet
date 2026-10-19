@@ -1,14 +1,29 @@
 <script setup lang="ts">
 // One pane: where it lives, its live terminal (watching, or in control), the key
 // buttons and the prompt bar.
-import { computed, defineAsyncComponent, ref, shallowRef, watch } from "vue";
-import { ArrowLeft, FileUp, Keyboard, LogOut, Maximize2, SearchX, TriangleAlert, Info, OctagonAlert } from "@lucide/vue";
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Expand,
+  FileUp,
+  Info,
+  Keyboard,
+  LogOut,
+  Maximize2,
+  OctagonAlert,
+  SearchX,
+  Shrink,
+  TriangleAlert,
+} from "@lucide/vue";
 import HarnessIcon from "./HarnessIcon.vue";
 import StatePill from "./StatePill.vue";
 import KeyBar from "./KeyBar.vue";
 import PromptBar from "./PromptBar.vue";
 import PaneMenu from "./PaneMenu.vue";
-import { closePane, confirmAsk, notify, paneIndex } from "../lib/store";
+import { app, closePane, confirmAsk, load, notify, openPane, paneIndex, save, showMachine } from "../lib/store";
+import { agentOrder } from "../lib/groups";
 import { draggingFiles, filesOf } from "../lib/attach";
 import { harnessOf, type PaneInfo } from "../lib/fleet";
 import type { TermState } from "../lib/term";
@@ -25,6 +40,7 @@ const gone = computed(() => !info.value && !!last.value);
 // xterm and its WebGL renderer load with the first pane, not with the fleet tree.
 const TerminalView = defineAsyncComponent(() => import("./TerminalView.vue"));
 interface TerminalControls {
+  watchWhole: (size: { cols: number; rows: number } | null) => void;
   takeControl: (takeover?: boolean) => void;
   release: () => void;
   fit: () => void;
@@ -36,6 +52,41 @@ const prompt = ref<{ addFiles: (files: File[]) => void }>();
 const state = ref<TermState>();
 const control = computed(() => state.value?.mode === "control");
 const controlling = computed(() => control.value && state.value?.phase === "open");
+// While in control, Ctrl-K belongs to the terminal, not to the search palette.
+watch(controlling, (c) => (app.typing = c), { immediate: true });
+onBeforeUnmount(() => (app.typing = false));
+
+// ---------------------------------------------------------------- watching the whole pane
+// Watching asks for a size that fills this box at a readable font; a pane wider than that
+// is cut off at the right. "Whole pane" watches it at its real size, scaled down to fit.
+
+const wholePref = ref(load<boolean>("ember.watch-whole", false));
+// The preference survives control (which always keeps the pane's real size): the terminal
+// uses it whenever it watches.
+const whole = computed(() => (wholePref.value ? (p.value?.size ?? null) : null));
+function toggleWhole() {
+  wholePref.value = !wholePref.value;
+  save("ember.watch-whole", wholePref.value);
+}
+
+// ---------------------------------------------------------------- the previous and next agent
+
+const order = computed(() => agentOrder.value.filter((x) => x.key === props.paneKey || x.online));
+const at = computed(() => order.value.findIndex((x) => x.key === props.paneKey));
+const prev = computed(() => (order.value.length > 1 && at.value >= 0 ? order.value[(at.value - 1 + order.value.length) % order.value.length] : undefined));
+const next = computed(() => (order.value.length > 1 && at.value >= 0 ? order.value[(at.value + 1) % order.value.length] : undefined));
+
+function stepKeys(e: KeyboardEvent) {
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || app.palette) return;
+  const t = e.target as HTMLElement | null;
+  if (t?.closest?.("input, textarea, select, [contenteditable], .xterm, [role='dialog']")) return;
+  if (e.key === "[" && prev.value) openPane(prev.value.ref);
+  else if (e.key === "]" && next.value) openPane(next.value.ref);
+  else return;
+  e.preventDefault();
+}
+window.addEventListener("keydown", stepKeys);
+onBeforeUnmount(() => window.removeEventListener("keydown", stepKeys));
 
 const why = computed(() => {
   const x = p.value;
@@ -103,14 +154,28 @@ function onDrop(e: DragEvent) {
   else notify(why.value || "This is a plain shell: take control to drop files into it.", "warn");
 }
 
-/** What the header calls each level, skipping the ones the tree skips. */
+/**
+ * Where the pane lives: machine / user / session / workspace / tab, skipping levels the tree
+ * skips and any that only repeat the one before ("Kelvin / kelvin / kelvin").
+ */
 const crumbs = computed(() => {
   const x = p.value;
   if (!x) return [];
-  const out = [x.dock.user];
-  if (x.session.name !== "default") out.push(x.session.name);
-  if (x.workspace?.label) out.push(x.workspace.label);
-  if (multiTab.value && x.tab?.label) out.push(x.tab.label);
+  const out: { text: string; what: string; go?: () => void }[] = [];
+  const add = (text: string | undefined, what: string, go?: () => void) => {
+    if (!text) return;
+    const last = out.at(-1)?.text.toLowerCase();
+    if (last === text.toLowerCase()) {
+      out[out.length - 1].what += ` and ${what}`;
+      return;
+    }
+    out.push({ text, what, go });
+  };
+  add(x.host, "machine", () => showMachine(x.host));
+  add(x.dock.user, "OS user", () => showMachine(x.host));
+  if (x.session.name !== "default") add(x.session.name, "herdr session");
+  add(x.workspace?.label, "workspace");
+  if (multiTab.value) add(x.tab?.label, "tab");
   return out;
 });
 </script>
@@ -125,15 +190,21 @@ const crumbs = computed(() => {
     @drop="onDrop"
   >
     <header class="pane-head">
-      <button class="icon-button back" aria-label="Back to the fleet" @click="closePane"><ArrowLeft :size="20" /></button>
+      <button class="back-button" title="Back to the overview" aria-label="Back to the overview" @click="closePane">
+        <ArrowLeft :size="18" /><span class="nav-label">Overview</span>
+      </button>
       <HarnessIcon :harness="p.harness" />
       <div class="pane-title">
-        <div class="crumbs">
-          <span class="host">{{ p.host }}</span>
-          <template v-for="c in crumbs" :key="c"><span class="slash">/</span><span>{{ c }}</span></template>
-        </div>
+        <nav class="crumbs" aria-label="Where this pane lives">
+          <template v-for="(c, i) in crumbs" :key="c.text + i"
+            ><span v-if="i" class="slash">/</span
+            ><button v-if="c.go" class="crumb" :class="{ host: !i }" :title="`${c.what}: ${c.text}. Open this machine`" @click="c.go"
+              >{{ c.text }}</button
+            ><span v-else class="crumb" :title="`${c.what}: ${c.text}`">{{ c.text }}</span></template
+          >
+        </nav>
         <h1>
-          <span class="label">{{ p.name }}</span>
+          <span class="label" :title="p.label">{{ p.label }}</span>
           <span v-if="p.pane.label && p.harness" class="harness-name">{{ harnessOf(p.harness)?.name }}</span>
           <StatePill v-if="p.harness" :status="p.status" :offline="!p.online" />
         </h1>
@@ -142,9 +213,38 @@ const crumbs = computed(() => {
         </div>
       </div>
       <div class="pane-actions">
+        <span class="step" role="group" aria-label="Other agents">
+          <button
+            class="icon-button"
+            :disabled="!prev"
+            :title="prev ? `Previous agent: ${prev.label} ([)` : 'No other agent'"
+            :aria-label="prev ? `Previous agent: ${prev.label}` : 'No previous agent'"
+            @click="prev && openPane(prev.ref)"
+          >
+            <ChevronLeft :size="18" />
+          </button>
+          <button
+            class="icon-button"
+            :disabled="!next"
+            :title="next ? `Next agent: ${next.label} (])` : 'No other agent'"
+            :aria-label="next ? `Next agent: ${next.label}` : 'No next agent'"
+            @click="next && openPane(next.ref)"
+          >
+            <ChevronRight :size="18" />
+          </button>
+        </span>
         <span class="mode-badge" :class="{ control: controlling }"
           ><i /><span class="label">{{ controlling ? "In control" : "Watching" }}</span></span
         >
+        <button
+          v-if="!control && p.size"
+          class="secondary small whole"
+          :aria-pressed="wholePref"
+          :title="wholePref ? 'Watch at a size that fits this window (larger text; wide lines may be cut off)' : `Watch the whole pane (${p.size.cols}×${p.size.rows}), scaled down to fit`"
+          @click="toggleWhole"
+        >
+          <Shrink v-if="wholePref" :size="14" /><Expand v-else :size="14" /><span class="label">{{ wholePref ? "Fit text" : "Whole pane" }}</span>
+        </button>
         <button
           v-if="!control"
           class="secondary small"
@@ -190,7 +290,7 @@ const crumbs = computed(() => {
       </div>
     </div>
 
-    <TerminalView ref="term" :pane="p" :gone="gone" @state="state = $event" />
+    <TerminalView ref="term" :pane="p" :gone="gone" :whole="whole" @state="state = $event" />
 
     <div v-if="filesOver" class="pane-drop" :class="dropMode" aria-hidden="true">
       <FileUp :size="26" />
@@ -209,6 +309,6 @@ const crumbs = computed(() => {
     <SearchX :size="28" />
     <h2>That pane isn’t in the fleet</h2>
     <p class="hint">It may have closed, or its machine may not have reported in yet.</p>
-    <button class="secondary" @click="closePane"><ArrowLeft :size="15" />Back to the fleet</button>
+    <button class="secondary" @click="closePane"><ArrowLeft :size="15" />Back to the overview</button>
   </div>
 </template>

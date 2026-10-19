@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watchEffect } from "vue";
+import { computed, onMounted, ref, watchEffect } from "vue";
 import { RefreshCw } from "@lucide/vue";
 import TopBar from "./components/TopBar.vue";
 import SigninRequests from "./components/SigninRequests.vue";
@@ -7,11 +7,17 @@ import FleetSidebar from "./components/FleetSidebar.vue";
 import PaneView from "./components/PaneView.vue";
 import EmptyFleet from "./components/EmptyFleet.vue";
 import Overview from "./components/Overview.vue";
-import FleetDialog from "./components/FleetDialog.vue";
+import AgentsView from "./components/AgentsView.vue";
+import MachinesView from "./components/MachinesView.vue";
+import MachineView from "./components/MachineView.vue";
+import SettingsView from "./components/SettingsView.vue";
+import CommandPalette from "./components/CommandPalette.vue";
+import Modal from "./components/Modal.vue";
+import AddMachine from "./components/AddMachine.vue";
 import SignIn from "./components/SignIn.vue";
 import AskDialog from "./components/AskDialog.vue";
 import Toasts from "./components/Toasts.vue";
-import { app, blocked, boot, machines, save, selectedKey, sidebarWidth } from "./lib/store";
+import { app, blocked, boot, machines, page, save, selectedKey, sidebarWidth } from "./lib/store";
 import { watchAlerts } from "./lib/alerts";
 
 watchEffect(() => {
@@ -24,6 +30,25 @@ onMounted(() => {
   watchAlerts();
   void boot();
 });
+
+/** Agents, Machines and Settings are full pages; the overview and panes keep the fleet tree. */
+const fullPage = computed(() => ["agents", "machines", "machine", "settings"].includes(page.value.name));
+const paneOpen = computed(() => page.value.name === "pane");
+
+// Ctrl/Cmd-K opens search anywhere, except Ctrl-K while typing into a terminal you control.
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (app.phase !== "ready" || e.key.toLowerCase() !== "k" || e.shiftKey || e.altKey) return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const inTerminal = (e.target as HTMLElement | null)?.closest?.(".xterm");
+    if (e.ctrlKey && !e.metaKey && app.typing && inTerminal) return;
+    e.preventDefault();
+    e.stopPropagation();
+    app.palette = !app.palette;
+  },
+  true,
+);
 
 const reload = () => location.reload();
 
@@ -50,7 +75,7 @@ function resize(e: PointerEvent) {
   <div
     v-if="app.phase === 'ready'"
     class="app-shell"
-    :class="{ 'has-pane': !!selectedKey, empty: !machines.length }"
+    :class="{ 'has-pane': paneOpen, 'full-page': fullPage, empty: !machines.length }"
     :style="{ '--sidebar-w': `${sidebarWidth}px` }"
   >
     <TopBar />
@@ -59,7 +84,13 @@ function resize(e: PointerEvent) {
       <RefreshCw :size="16" /><span>The fleet hub was updated to {{ app.newVersion }}. Reload for the new page.</span>
       <button class="primary small" @click="reload">Reload</button>
     </div>
-    <main class="fleet-main">
+    <main v-if="fullPage" class="page-main">
+      <AgentsView v-if="page.name === 'agents'" />
+      <MachinesView v-else-if="page.name === 'machines'" />
+      <MachineView v-else-if="page.name === 'machine'" :key="page.host" />
+      <SettingsView v-else-if="page.name === 'settings'" />
+    </main>
+    <main v-else class="fleet-main">
       <FleetSidebar />
       <div
         class="resizer"
@@ -76,12 +107,16 @@ function resize(e: PointerEvent) {
         @pointerdown.prevent="resize"
       />
       <section class="stage" aria-label="Agent workspace">
-        <PaneView v-if="selectedKey" :key="selectedKey" :pane-key="selectedKey" />
+        <PaneView v-if="paneOpen && selectedKey" :key="selectedKey" :pane-key="selectedKey" />
+        <div v-else-if="paneOpen" class="pane-missing"><p class="hint">Finding that agent…</p></div>
         <EmptyFleet v-else-if="!machines.length" />
         <Overview v-else />
       </section>
     </main>
-    <FleetDialog v-if="app.settings" />
+    <Modal v-if="app.adding" eyebrow="Expand your workspace" title="Add a machine" wide @close="app.adding = false">
+      <AddMachine @done="app.adding = false" @back="app.adding = false" />
+    </Modal>
+    <CommandPalette />
   </div>
   <SignIn v-else />
   <AskDialog />

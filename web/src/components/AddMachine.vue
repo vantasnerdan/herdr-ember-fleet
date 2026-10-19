@@ -2,7 +2,7 @@
 // Add a machine: name it, then run one command on it. The link inside is single use and
 // expires in 24 hours; until it is used it is a secret.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { ArrowLeft, Check, CircleCheck, Copy, KeyRound, LoaderCircle, Plus, X } from "@lucide/vue";
+import { Check, CircleCheck, Copy, KeyRound, LoaderCircle, Plus, X } from "@lucide/vue";
 import { api, errorText } from "../lib/api";
 import { confirmAsk, notify } from "../lib/store";
 import type { LinkState, NewLink } from "../lib/types";
@@ -117,9 +117,7 @@ onBeforeUnmount(() => clearInterval(poll));
       </p>
       <p v-if="error" class="message-error" role="alert">{{ error }}</p>
       <footer>
-        <button v-if="!inline" type="button" class="secondary" @click="emit('back')">
-          <ArrowLeft :size="15" />Back
-        </button>
+        <button v-if="!inline" type="button" class="secondary" @click="emit('back')">Cancel</button>
         <button class="primary" :disabled="busy || !name.trim()"><Plus :size="15" />Create join link</button>
       </footer>
     </form>

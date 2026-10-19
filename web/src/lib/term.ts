@@ -142,6 +142,8 @@ export class TermView {
   private awaitFull = true;
   /** The size last asked of an observer. */
   private asked = { cols: 0, rows: 0 };
+  /** Watching the whole pane at its real size (scaled down to fit), instead of at a size that fits. */
+  private whole: { cols: number; rows: number } | null = null;
   /** CSS px per font px, measured from xterm's own screen at its current font size. */
   private ratio = { w: 0.6, h: 1.2 };
   /** The same, per font size: cells round to device pixels, so the ratio moves with the size. */
@@ -254,7 +256,7 @@ export class TermView {
     this.retry = undefined;
     this.awaitFull = true;
     this.lastSeq = 0;
-    const size = mode === "observe" ? this.wantedSize() : { cols: 0, rows: 0 };
+    const size = mode === "observe" ? this.observeSize() : { cols: 0, rows: 0 };
     if (mode === "observe") this.asked = size;
     const q = new URLSearchParams({
       dock: this.target.dock,
@@ -410,6 +412,7 @@ export class TermView {
       this.attempts = 0;
       this.set({ phase: "open", reason: undefined, retryIn: undefined });
       if (this.state.mode === "control") this.term.focus();
+      else this.reconcileObserver(); // the preferred size may have changed while it connected
       return;
     }
     if (state === "busy") {
@@ -484,6 +487,30 @@ export class TermView {
     return { w: Math.max(0, w), h: Math.max(0, h) };
   }
 
+  /**
+   * Watch the pane at its real size, scaled down to fit (nothing cut off at the right), or
+   * (null) at a size that fills the box at a readable font. Only changes watching.
+   */
+  watchWhole(size: { cols: number; rows: number } | null) {
+    this.whole = size; // kept through control; only watching uses it
+    this.reconcileObserver();
+  }
+
+  /** An open observer asks again if the size it should watch at differs from the one it asked for. */
+  private reconcileObserver() {
+    if (this.state.mode !== "observe" || this.state.phase !== "open") return;
+    const want = this.observeSize();
+    if (want.cols === this.asked.cols && want.rows === this.asked.rows) return;
+    this.asked = want;
+    this.awaitFull = true;
+    this.lastSeq = 0;
+    this.send({ type: "resize", ...want });
+  }
+
+  private observeSize() {
+    return this.whole ?? this.wantedSize();
+  }
+
   /** The size that fills this box at a comfortable font size. */
   wantedSize() {
     const { w, h } = this.box();
@@ -501,7 +528,7 @@ export class TermView {
     clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
       if (this.state.mode !== "observe" || this.state.phase !== "open") return;
-      const want = this.wantedSize();
+      const want = this.observeSize();
       if (want.cols === this.asked.cols && want.rows === this.asked.rows) return;
       this.asked = want;
       // The dock restarts the observer at the new size; its stream begins with a full frame.

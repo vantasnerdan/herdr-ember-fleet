@@ -186,7 +186,7 @@
   height: 26px;
 }
 .tree-row:hover .row-more,
-.tree-row.focus .row-more,
+.tree-list:focus-visible .tree-row.focus .row-more,
 .tree-row .row-more:focus-visible {
   visibility: visible;
   pointer-events: auto;

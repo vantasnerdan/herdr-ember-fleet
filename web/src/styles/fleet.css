@@ -54,28 +54,6 @@
   text-overflow: ellipsis;
 }
 .top-actions { display: flex; align-items: center; gap: 18px; flex: none; }
-.overview-button {
-  gap: 8px;
-  padding: 8px 11px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.overview-button.active {
-  color: var(--ember-coral);
-  border-color: rgb(244 120 83 / 0.18);
-  background: rgb(244 120 83 / 0.05);
-}
-.summary-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.summary-pill b { font-weight: 400; color: var(--ember-text); }
 .needs-pill {
   gap: 8px;
   padding: 6px 10px;
@@ -235,7 +213,9 @@
 .tree-row:hover {
   background: rgb(244 247 251 / 0.03);
 }
-.tree-row.focus {
+/* The keyboard's place in the tree: shown only while moving with the keyboard,
+   so a row clicked earlier never looks selected next to the open one. */
+.tree-list:focus-visible .tree-row.focus {
   box-shadow: inset 0 0 0 1px #465980;
 }
 .tree-row.sel {
@@ -395,10 +375,24 @@
   color: var(--ember-label);
 }
 .tree-row.pane .sub {
-  font-size: 12px;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
   color: var(--muted);
+}
+.tree-row.pane .sub .where {
+  flex: none; /* the machine's name is never cut short; the task gives way */
+}
+.tree-row.pane .sub .task {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-row.pane .sub .where + .task::before {
+  content: "· ";
+  color: var(--ember-dim);
 }
 .tree-row.pane .sub .cwd {
   color: var(--ember-dim);
@@ -528,7 +522,6 @@
 
 /* Compact desktop keeps the identity readable at large sidebar widths. */
 @media (max-width: 1100px) {
-  .summary-pill { display: none; }
   .top-actions { gap: 12px; }
   .topbar { padding: 0 18px; }
 }
@@ -541,7 +534,7 @@
   .brand-caption { font-size: 8px; letter-spacing: 1px; }
   .brand .fleet-name { font-size: 13px; }
   .top-actions { gap: 10px; }
-  .overview-button, .summary-pill, .connection .label, .needs-pill { display: none; }
+  .connection .label, .needs-pill { display: none; }
   .fleet-main { padding: 8px; }
   .resizer { display: none; }
   .sidebar { width: 100%; max-width: none; }

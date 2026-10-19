@@ -14,9 +14,10 @@ Agents run in [herdr](https://herdr.dev) panes: Claude Code, Codex, omp, Grok, g
 
 ## What you get
 
-- **One page for the whole fleet.** Machine → OS user → herdr session → workspace → tab → pane, with each agent's harness and state (working, idle, blocked, done), live.
-- **Needs you.** Every blocked agent across the fleet, in one list, with browser notifications.
-- **Live terminals.** Watch any pane read-only; *Take control* to type; a prompt bar and Esc / Ctrl-C / Enter buttons.
+- **One page for the whole fleet.** Machine → OS user → herdr session → workspace → tab → pane, with each agent's harness and state (working, needs you, idle, done), live. Arrange the tree by your own groups (Physics, Coding, Burst…) or by machine; each agent shows once.
+- **Find any agent fast.** Ctrl/Cmd-K searches agents, machines and pages. **Agents** lists every agent with its task, place, state and last activity, sortable and filterable. **Machines** shows each machine's users, groups, agents and versions. Every view has a link you can bookmark, like `#/a/studio/agent-one/w1:p2`.
+- **Needs you.** Every agent waiting for input across the fleet, in one list, with browser notifications.
+- **Live terminals.** Watch any pane read-only (fitted to the window, or the whole pane scaled down); *Take control* to type; a prompt bar and Esc / Ctrl-C / Enter buttons that work without taking control. `[` and `]` step to the previous and next agent.
 - **The herdr app you already use, no SSH.** `ember-fleet attach studio` opens the unchanged herdr app on that machine through the relay.
 - **One pane in your terminal.** `ember-fleet term studio/w1:p2` (or `studio/codex`).
 - **Reach machines SSH can't.** Every computer dials *out* to the relay. Laptops that change networks, machines behind NAT and VMs with new addresses just reconnect.
@@ -62,7 +63,7 @@ ember-fleet service install hub
 ember-fleet login-link                       # open the link it prints
 ```
 
-To sign in from other computers, make a **PIN**: `ember-fleet pin`, or **Settings › Signing in** on the page. Type it on the sign-in page of any browser that can reach the hub. It doesn't expire, and the browser stays signed in while it's used. With no PIN with you, a new browser shows a code and asks to be approved: a browser that is already signed in shows the same code with **Approve**. **Settings › Signing in** also lists the signed-in browsers, and you can sign any of them out.
+To sign in from other computers, make a **PIN**: `ember-fleet pin`, or **Settings › Signing in** on the page. Type it on the sign-in page of any browser that can reach the hub. It doesn't expire, and the browser stays signed in while it's used. With no PIN with you, a new browser shows a code and asks to be approved: a browser that is already signed in shows the same code with **Approve**. **Settings › Browsers** lists the signed-in browsers, and you can sign any of them out.
 
 **4. Add machines.** Use **Add a machine** on the page, or:
 

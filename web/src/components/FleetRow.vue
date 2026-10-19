@@ -72,6 +72,15 @@ const machineMeta = computed(() => {
   return [`${on} of ${plural(docks.length, "user")} online`, plural(c.agents, "agent")].join(" · ");
 });
 
+/** Under an agent's name: what its screen says, else its folder (already in the name when names repeat). */
+const subText = computed(() => {
+  const p = pane.value;
+  if (!p) return "";
+  const cwd = p.cwd ? shortPath(p.cwd) : "";
+  if (p.label !== p.name) return n.value.context ? "" : cwd;
+  if (n.value.context) return p.title || (p.harness ? "" : "shell");
+  return [p.title || (p.harness ? "" : "shell"), cwd].filter(Boolean).join(" · ");
+});
 const dot = computed(() => (n.value.online ? (n.value.error ? "err" : "on") : "off"));
 
 const title = computed(() => {
@@ -79,7 +88,7 @@ const title = computed(() => {
   if (node.kind === "pane" && node.pane) {
     const p = node.pane;
     return [
-      p.name + (p.harness ? ` (${p.harness}, ${p.status})` : " (shell)"),
+      p.label + (p.harness ? ` (${p.harness}, ${p.status})` : " (shell)"),
       `${p.dock.user}@${p.host}`,
       p.title,
       p.cwd,
@@ -207,15 +216,12 @@ function openMenu(e: MouseEvent) {
       <HarnessIcon :harness="pane.harness" />
       <span class="two">
         <span
-          ><span class="name">{{ pane.name }}</span
+          ><span class="name">{{ pane.label }}</span
           ><span v-if="tag" class="group-tag" :style="tagHex ? { '--group': tagHex } : undefined">{{ tag.name }}</span></span
         >
         <span class="sub"
           ><span v-if="n.context" class="where">{{ n.context }}</span
-          ><template v-if="n.context && (pane.title || pane.cwd)"> · </template
-          >{{ pane.title || (pane.harness ? "" : "shell")
-          }}<template v-if="pane.title && pane.cwd && !n.context"> · </template
-          ><span v-if="pane.cwd && !n.context" class="cwd">{{ shortPath(pane.cwd) }}</span></span
+          ><span v-if="subText" class="task">{{ subText }}</span></span
         >
       </span>
     </template>

@@ -4,9 +4,11 @@
   gap: 8px;
   margin: 10px 0 12px;
 }
-/* override the dialog's stacked label and full-width input styles */
-.modal .update-settings label.check {
+/* inline checkboxes, a small select */
+.update-settings label.check {
+  display: flex;
   flex-direction: row;
+  color: var(--ember-text);
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
@@ -14,7 +16,7 @@
   font-size: 13px;
   text-align: left;
 }
-.modal .update-settings input[type="checkbox"] {
+.update-settings input[type="checkbox"] {
   accent-color: var(--ember-coral, #f47853);
   width: 15px;
   height: 15px;
@@ -23,15 +25,15 @@
   margin: 0;
   flex: none;
 }
-.modal .update-settings .check-text {
+.update-settings .check-text {
   flex: 1;
   min-width: 0;
 }
-.modal .update-settings label.check:has(.check-text) {
+.update-settings label.check:has(.check-text) {
   flex-wrap: nowrap;
   align-items: flex-start;
 }
-.modal .update-settings select {
+.update-settings select {
   width: auto;
   background: rgba(7, 11, 22, 0.8);
   color: inherit;

@@ -7,8 +7,8 @@
 
 import { computed } from "vue";
 import { api, errorText } from "./api";
-import { container, dockNode, paneNode, refKey, type Counts, type TreeNode } from "./fleet";
-import { groups, machines, notify, paneIndex } from "./store";
+import { container, dockNode, paneNode, prune, refKey, type Counts, type PaneInfo, type TreeNode } from "./fleet";
+import { groups, machines, notify, paneIndex, tree, treeView } from "./store";
 import type { Dock, Group, GroupColor, Member } from "./types";
 
 // ---------------------------------------------------------------- colours
@@ -100,6 +100,10 @@ function gone(g: Group, m: Member, index: number): TreeNode {
   };
 }
 
+/** A pane that is a group member in its own right (not just through its machine user). */
+const placedOnItsOwn = (n: TreeNode) =>
+  n.kind === "pane" && !!n.pane && groupOf.value.has(memberKey({ kind: "pane", ...n.pane.ref }));
+
 export const groupTree = computed<TreeNode[]>(() =>
   groups.value.map((g) => {
     const prefix = `g:${g.id}|`;
@@ -107,7 +111,8 @@ export const groupTree = computed<TreeNode[]>(() =>
       let node: TreeNode | undefined;
       if (m.kind === "dock") {
         const d = docksById.value.get(m.dock);
-        if (d) node = dockNode(d.host, d.dock);
+        // A pane placed in a group of its own shows there, not again under its machine user.
+        if (d) node = prune([dockNode(d.host, d.dock)], placedOnItsOwn)[0];
       } else {
         const p = paneIndex.value.get(refKey(m));
         if (p) node = { ...paneNode(p), context: `${p.dock.user}@${p.host}` };
@@ -129,6 +134,28 @@ export const groupTree = computed<TreeNode[]>(() =>
 );
 
 // ---------------------------------------------------------------- changes
+
+/**
+ * Agents in the order the sidebar shows them (grouped first in the Groups view), for
+ * stepping to the previous or next agent.
+ */
+export const agentOrder = computed<PaneInfo[]>(() => {
+  const out: PaneInfo[] = [];
+  const seen = new Set<string>();
+  const walk = (nodes: TreeNode[]) => {
+    for (const n of nodes) {
+      const p = n.pane;
+      if (n.kind === "pane" && p?.harness && !seen.has(p.key)) {
+        seen.add(p.key);
+        out.push(p);
+      }
+      walk(n.children);
+    }
+  };
+  if (treeView.value === "groups") walk(groupTree.value);
+  walk(tree.value);
+  return out;
+});
 
 function moved(list: Group[], member: Member, groupId: string | null, index?: number): Group[] {
   const key = memberKey(member);

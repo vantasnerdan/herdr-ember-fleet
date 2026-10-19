@@ -1,10 +1,10 @@
 // App state: who is signed in, the fleet as the hub last described it, which pane is
 // open, and the small dialogs and notices every component may raise.
 
-import { computed, reactive, ref, shallowRef } from "vue";
+import { computed, reactive, ref, shallowRef, watch } from "vue";
 import { api, ApiError, errorText, setCsrf, whenFleetRenamed, whenSignedOut } from "./api";
-import { allPanes, buildTree, parseRefKey, refKey, type PaneInfo, type PaneRef } from "./fleet";
-import type { Group, LiveMessage, Machine, Me, UpdateStatus, SigninAsk } from "./types";
+import { addrPart, allPanes, buildTree, parseRefKey, refKey, type PaneInfo, type PaneRef } from "./fleet";
+import type { BrowserSession, Group, LiveMessage, Machine, Me, PinStatus, UpdateStatus, SigninAsk } from "./types";
 import { connectLive } from "./live";
 
 export type Phase = "loading" | "signed-out" | "signing-in" | "signin-failed" | "unreachable" | "ready";
@@ -19,8 +19,12 @@ export const app = reactive({
   pinSignin: false,
   /** The hub now runs a newer build than this page: offer a reload. */
   newVersion: "",
-  /** Fleet settings: which view is open, if any. */
-  settings: null as null | "fleet" | "add",
+  /** "Add a machine" is open. */
+  adding: false,
+  /** The command palette (Ctrl/Cmd-K) is open. */
+  palette: false,
+  /** In control of a terminal: Ctrl-K belongs to it, not to the palette. */
+  typing: false,
   filter: "",
 });
 
@@ -39,6 +43,10 @@ export const groups = shallowRef<Group[]>([]);
 
 /** Fleet updates (versions, schedule, last run), kept live while settings are open. */
 export const updates = shallowRef<UpdateStatus | null>(null);
+
+/** Settings: the PIN's state and the signed-in browsers, shared by the panels that show them. */
+export const pinStatus = shallowRef<PinStatus | null>(null);
+export const browserSessions = shallowRef<BrowserSession[]>([]);
 
 /** Browsers asking to be signed in, for the approval banner. */
 export const signinRequests = shallowRef<SigninAsk[]>([]);
@@ -88,9 +96,34 @@ export function setOpen(key: string, open: boolean) {
 
 export const sidebarWidth = ref(load<number>("ember.sidebar", 372));
 
-// ---------------------------------------------------------------- the open pane (#/p/<dock>/<session>/<pane>)
+/** How the sidebar arranges the fleet, and whether it lists plain shells. */
+export const treeView = ref<"groups" | "machines">(load<string>("ember.tree-view", "groups") === "machines" ? "machines" : "groups");
+export const showShells = ref(load<boolean>("ember.shells", false));
+watch(treeView, (v) => save("ember.tree-view", v));
+watch(showShells, (v) => save("ember.shells", v));
 
-export const selectedKey = ref<string | null>(keyFromHash());
+// ---------------------------------------------------------------- where the viewer is (the URL's #)
+//
+//   (none)                     overview
+//   #/a/<host>/<user>[/<session>]/<pane>   an agent's pane (#/p/<dock>/<session>/<pane> still works)
+//   #/agents[/<status>]        every agent in one list
+//   #/machines[/<host>]        machines, or one machine
+//   #/settings[/<section>]     settings
+
+export type AgentFilter = "all" | "blocked" | "working" | "idle" | "done";
+export type Page =
+  | { name: "overview" }
+  | { name: "pane" }
+  | { name: "agents"; status: AgentFilter }
+  | { name: "machines" }
+  | { name: "machine"; host: string }
+  | { name: "settings"; section: string };
+
+const FILTERS: readonly AgentFilter[] = ["all", "blocked", "working", "idle", "done"];
+
+export const page = shallowRef<Page>({ name: "overview" });
+/** The open pane's internal key (dock/session/pane), or a placeholder for an address not in the fleet. */
+export const selectedKey = ref<string | null>(null);
 export const selectedPane = computed(() =>
   selectedKey.value ? paneIndex.value.get(selectedKey.value) : undefined,
 );
@@ -98,32 +131,117 @@ export const selectedRef = computed<PaneRef | undefined>(() =>
   selectedKey.value ? parseRefKey(selectedKey.value) : undefined,
 );
 
-function keyFromHash(): string | null {
-  const m = /^#\/p\/(.+)$/.exec(location.hash);
-  return m && parseRefKey(m[1]) ? m[1] : null;
+/** A pane address that came in before the fleet did; resolved when it arrives. */
+let pendingAddr: string | null = null;
+let fleetLoaded = false;
+
+function decodeParts(rest: string): string[] | null {
+  try {
+    return rest.split("/").map(decodeURIComponent);
+  } catch {
+    return null;
+  }
+}
+
+function paneByAddr(addr: string): PaneInfo | undefined {
+  return panes.value.find((p) => p.addr === addr);
+}
+
+function resolveAddr(addr: string) {
+  const p = paneByAddr(addr);
+  if (p) {
+    pendingAddr = null;
+    selectedKey.value = p.key;
+  } else {
+    // Not here (yet): its machine may still be reconnecting, so keep looking.
+    pendingAddr = addr;
+    selectedKey.value = fleetLoaded ? `?/${addr}` : null; // PaneView says it isn't in the fleet
+  }
+}
+
+function readHash() {
+  const h = location.hash.replace(/^#\/?/, "");
+  const [head, ...rest] = h.split("/");
+  pendingAddr = null;
+  if (head === "a" && rest.length >= 3) {
+    page.value = { name: "pane" };
+    // the same address however it was escaped (a pasted link may differ)
+    const parts = decodeParts(rest.join("/"));
+    resolveAddr(parts ? parts.map(addrPart).join("/") : rest.join("/"));
+    return;
+  }
+  selectedKey.value = null;
+  const legacy = head === "p" ? parseRefKey(rest.join("/")) : undefined;
+  if (legacy) {
+    page.value = { name: "pane" };
+    selectedKey.value = refKey(legacy); // one spelling, however the link escaped it
+    const info = paneIndex.value.get(selectedKey.value);
+    if (info) history.replaceState({ ember: true }, "", `${location.pathname}${location.search}#/a/${info.addr}`);
+  } else if (head === "agents") {
+    const status = (FILTERS as readonly string[]).includes(rest[0] ?? "") ? (rest[0] as AgentFilter) : "all";
+    page.value = { name: "agents", status };
+  } else if (head === "machines" && rest[0]) {
+    const host = decodeParts(rest[0])?.[0];
+    page.value = host ? { name: "machine", host } : { name: "machines" };
+  } else if (head === "machines") page.value = { name: "machines" };
+  else if (head === "settings") page.value = { name: "settings", section: rest[0] || "general" };
+  else page.value = { name: "overview" };
+}
+readHash();
+
+function go(hash: string, replace = false) {
+  const url = `${location.pathname}${location.search}${hash}`;
+  if (url === `${location.pathname}${location.search}${location.hash}`) return;
+  if (replace) history.replaceState({ ember: true }, "", url);
+  else history.pushState({ ember: true }, "", url);
+  readHash();
+}
+
+export const showOverview = () => go("");
+export const showAgents = (status: AgentFilter = "all") => go(status === "all" ? "#/agents" : `#/agents/${status}`, page.value.name === "agents");
+export const showMachines = () => go("#/machines");
+export const showMachine = (host: string) => go(`#/machines/${encodeURIComponent(host)}`);
+export const showSettings = (section = "general") =>
+  go(section === "general" ? "#/settings" : `#/settings/${section}`, page.value.name === "settings");
+
+/** Agents opened lately, newest first (for the palette). */
+export const recent = ref<string[]>(load<string[]>("ember.recent", []));
+function remember(key: string) {
+  recent.value = [key, ...recent.value.filter((k) => k !== key)].slice(0, 8);
+  save("ember.recent", recent.value);
 }
 
 export function openPane(ref: PaneRef) {
   const key = refKey(ref);
+  remember(key);
   // Opening a pane never unfolds the machine tree; the viewer folds and
   // unfolds machines by hand.
-  if (selectedKey.value === key) return;
-  history.pushState({ ember: true }, "", `${location.pathname}${location.search}#/p/${key}`);
-  selectedKey.value = key;
+  if (page.value.name === "pane" && selectedKey.value === key) return;
+  const info = paneIndex.value.get(key);
+  go(info ? `#/a/${info.addr}` : `#/p/${key}`);
 }
 
-/** Back to the tree (on a phone) or to the overview. */
-export function closePane() {
-  if (!selectedKey.value) return;
-  // Go to the overview itself. (Stepping back through history landed on the
-  // previously opened agent instead.) The browser's Back still returns to the pane.
-  history.pushState({ ember: true }, "", `${location.pathname}${location.search}`);
-  selectedKey.value = null;
-}
+/** Back to the overview. (The browser's Back still returns to the pane.) */
+export const closePane = showOverview;
 
-window.addEventListener("popstate", () => {
-  selectedKey.value = keyFromHash();
+window.addEventListener("popstate", readHash);
+
+// Any new fleet data (the live feed's hello, a machine update, a refresh) may hold an agent
+// whose address came in before it did.
+watch(machines, () => {
+  if (fleetLoaded && pendingAddr) fleetArrived();
 });
+
+/** Called once the fleet has loaded, and when it changes while an address waits. */
+function fleetArrived() {
+  fleetLoaded = true;
+  if (pendingAddr && page.value.name === "pane") resolveAddr(pendingAddr);
+  // An open pane keeps a readable address once it is known.
+  else if (page.value.name === "pane" && selectedKey.value && location.hash.startsWith("#/p/")) {
+    const info = paneIndex.value.get(selectedKey.value);
+    if (info) history.replaceState({ ember: true }, "", `${location.pathname}${location.search}#/a/${info.addr}`);
+  }
+}
 
 // ---------------------------------------------------------------- notices
 
@@ -194,7 +312,7 @@ function signedOut() {
   machines.value = [];
   groups.value = [];
   app.me = null;
-  app.settings = null;
+  app.adding = false;
   if (app.phase !== "signin-failed") app.phase = "signed-out";
 }
 whenSignedOut(signedOut);
@@ -267,6 +385,7 @@ export async function boot() {
     app.me = me;
     machines.value = byHost((await api.fleet()).machines ?? []);
     groups.value = await loadGroups();
+    fleetArrived();
     app.phase = "ready";
     stopLive?.();
     stopLive = connectLive({

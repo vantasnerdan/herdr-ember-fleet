@@ -13,7 +13,12 @@ import { fontsReady, TermView, type TermState, type TermTarget } from "../lib/te
 import { ago, type PaneInfo } from "../lib/fleet";
 import { confirmAsk, notify, now, paneIndex, refreshFleet } from "../lib/store";
 
-const props = defineProps<{ pane: PaneInfo; gone: boolean }>();
+const props = defineProps<{
+  pane: PaneInfo;
+  gone: boolean;
+  /** Watch at the pane's real size, scaled to fit, instead of at a size that fits. */
+  whole?: { cols: number; rows: number } | null;
+}>();
 const emit = defineEmits<{ state: [s: TermState] }>();
 
 const host = ref<HTMLElement>();
@@ -76,6 +81,7 @@ onMounted(async () => {
   });
   view.value = v;
   if (import.meta.env.DEV) (window as unknown as { emberTerm?: TermView }).emberTerm = v;
+  v.watchWhole(props.whole ?? null);
   if (reachable.value) v.connect("observe");
   else v.stop(props.gone ? "gone" : "offline");
 });
@@ -191,11 +197,17 @@ function onPaste(e: ClipboardEvent) {
 
 onBeforeUnmount(() => uploads.forEach(dropAttachment));
 
+watch(
+  () => (props.whole ? `${props.whole.cols}x${props.whole.rows}` : ""),
+  () => view.value?.watchWhole(props.whole ?? null),
+);
+
 defineExpose({
   takeControl: (takeover = false) => view.value?.takeControl(takeover),
   release: () => view.value?.release(),
   fit: () => view.value?.fitToWindow(),
   dismiss: () => view.value?.dismissNotices(),
+  watchWhole: (size: { cols: number; rows: number } | null) => view.value?.watchWhole(size),
   uploadAndType,
 });
 </script>

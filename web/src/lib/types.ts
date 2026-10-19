@@ -38,6 +38,8 @@ export interface Dock {
   /** unix ms */
   lastSeen: number;
   role: Role;
+  /** this machine's ember-fleet version */
+  version?: string;
   sessions: Session[];
 }
 
@@ -48,6 +50,8 @@ export interface Session {
   online: boolean;
   error?: string;
   snapshot?: HerdrSnapshot;
+  /** pane_id → when its agent's current state began (unix ms), where the hub saw it change */
+  since?: Record<string, number>;
 }
 
 export interface Rect {

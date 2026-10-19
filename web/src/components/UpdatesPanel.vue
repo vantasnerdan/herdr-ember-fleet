@@ -2,7 +2,7 @@
 // Fleet updates: the hub pushes its own ember-fleet build to every machine and runs
 // `herdr update` there, once a day or on demand. Lives in the settings dialog.
 import { computed, onMounted, ref } from "vue";
-import { RefreshCw } from "@lucide/vue";
+import { RefreshCw, TriangleAlert } from "@lucide/vue";
 import { api, errorText } from "../lib/api";
 import { ago } from "../lib/fleet";
 import { now, updates } from "../lib/store";
@@ -43,7 +43,15 @@ async function runNow() {
   }
 }
 
-const behind = computed(() => (st.value?.docks ?? []).filter((d) => d.online && d.ember !== st.value?.target).length);
+const behindDocks = computed(() => (st.value?.docks ?? []).filter((d) => d.online && d.ember !== st.value?.target));
+const behind = computed(() => behindDocks.value.length);
+const failed = computed(() => (st.value?.docks ?? []).filter((d) => d.result?.error));
+const who = (list: UpdateDock[]) => list.map((d) => (d.machine === d.user ? d.machine : `${d.machine} (${d.user})`)).join(", ");
+/** Docks needing a look first, then the rest by name. */
+const sorted = computed(() => {
+  const rank = (d: UpdateDock) => (d.result?.error ? 0 : d.online && d.ember !== st.value?.target ? 1 : 2);
+  return [...(st.value?.docks ?? [])].sort((a, b) => rank(a) - rank(b) || a.machine.localeCompare(b.machine) || a.user.localeCompare(b.user));
+});
 
 function herdrLine(d: UpdateDock): string {
   if (!d.herdr) return "herdr ?";
@@ -64,13 +72,24 @@ function resultLine(d: UpdateDock): string {
 </script>
 
 <template>
-  <section class="fleet-section updates">
-    <h3><RefreshCw :size="16" />Updates</h3>
+  <section class="settings-panel updates">
     <template v-if="st">
       <p class="hint">
-        This hub hands out ember-fleet <b>{{ st.target }}</b> to every machine; herdr updates come from herdr.dev.
-        <template v-if="behind"> {{ behind }} machine{{ behind === 1 ? "" : "s" }} behind.</template>
+        This hub hands out ember-fleet <b>{{ st.target }}</b> to every machine. herdr updates come from herdr.dev.
       </p>
+      <div v-if="failed.length || behind" class="update-summary" role="status">
+        <TriangleAlert :size="16" />
+        <div>
+          <p v-if="failed.length">
+            <b>Last update failed on {{ who(failed) }}.</b> Their output is below.
+          </p>
+          <p v-if="behind">
+            <b>{{ behind }} machine{{ behind === 1 ? " is" : "s are" }} behind</b> ({{ who(behindDocks) }}). Update now
+            brings {{ behind === 1 ? "it" : "them" }} to {{ st.target }}.
+          </p>
+        </div>
+      </div>
+      <p v-else class="update-ok" role="status">Every machine that is online runs {{ st.target }}.</p>
       <div class="update-settings">
         <label class="check"
           ><input
@@ -107,10 +126,11 @@ function resultLine(d: UpdateDock): string {
             :disabled="saving || !st.settings.herdr"
             @change="save({ handoff: ($event.target as HTMLInputElement).checked })"
           /><span class="check-text"
-            >Live handoff: move running herdr servers to the new version now, keeping pane processes
+            >Live handoff
             <small class="muted"
-              >(experimental in herdr: monitors, waits and messages between panes can be cut and must reconnect;
-              without it, servers pick up the new version on their next restart)</small
+              >Moves running herdr servers to the new version now, keeping pane processes. Experimental in herdr:
+              monitors and messages between panes can drop and must reconnect. Without it, servers switch on their
+              next restart.</small
             ></span
           ></label
         >
@@ -122,7 +142,7 @@ function resultLine(d: UpdateDock): string {
         <small class="muted" v-if="st.lastRun">Last run {{ ago(st.lastRun, now) }}</small>
       </div>
       <ul class="item-list update-list">
-        <li v-for="d in st.docks" :key="d.id" :class="{ offline: !d.online }">
+        <li v-for="d in sorted" :key="d.id" :class="{ offline: !d.online, failed: !!d.result?.error }">
           <div class="item-text">
             <span class="line"
               ><b>{{ d.machine }}</b><span class="muted">·</span><span>{{ d.user }}</span

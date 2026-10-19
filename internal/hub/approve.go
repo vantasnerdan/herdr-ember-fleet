@@ -219,6 +219,21 @@ func (h *Hub) renewSession(hash string) (time.Time, bool) {
 	return exp, renewed
 }
 
+// nameSession records the browser of a session signed in before names were kept.
+func (h *Hub) nameSession(hash, agent string) {
+	h.store.Update(func(s *State) error {
+		bs := s.Sessions[hash]
+		if bs == nil || bs.Agent != "" {
+			return errors.New("nothing to do")
+		}
+		bs.Agent = agent
+		if bs.Via == "" {
+			bs.Via = "link"
+		}
+		return nil
+	})
+}
+
 func (h *Hub) signinsChanged() {
 	h.live.Lock()
 	defer h.live.Unlock()

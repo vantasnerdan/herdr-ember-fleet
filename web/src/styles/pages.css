@@ -1,0 +1,993 @@
+/* Pages (Agents, Machines, a machine, Settings), the top bar's places, search, and the
+   pane header's newer controls. Marbell Ember throughout: navy glass, coral for "here". */
+
+/* ---------------------------------------------------------------- top bar: places and search */
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+  padding-left: 6px;
+}
+.top-nav button {
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ember-label);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.top-nav button:hover {
+  color: var(--ember-text);
+}
+.top-nav button.active {
+  color: var(--ember-coral);
+  border-color: rgb(244 120 83 / 0.18);
+  background: rgb(244 120 83 / 0.05);
+}
+.nav-count {
+  font-size: 11px;
+  color: var(--ember-dim);
+}
+.top-nav button.active .nav-count {
+  color: rgb(244 120 83 / 0.75);
+}
+.search-button {
+  gap: 8px;
+  padding: 7px 8px 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ember-label);
+  font-size: 12.5px;
+  background: rgb(7 12 23 / 0.6);
+  white-space: nowrap;
+}
+.search-button:hover {
+  color: var(--ember-text);
+  border-color: var(--ember-line-high);
+}
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--ember-line-high);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--ember-label);
+  background: var(--ember-glass);
+}
+.settings-button.on {
+  color: var(--accent);
+  border-color: rgb(244 120 83 / 0.4);
+}
+
+/* ---------------------------------------------------------------- full pages */
+.app-shell.full-page .page-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.page {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: clamp(20px, 3vw, 40px) clamp(16px, 3vw, 40px) 48px;
+}
+.page-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.page-inner.wide {
+  max-width: 1180px;
+}
+.page-head .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10.5px;
+}
+.page-head h1 {
+  margin: 8px 0 4px;
+  font-size: clamp(24px, 2.4vw, 32px);
+  letter-spacing: -1.2px;
+  line-height: 1.25;
+  color: var(--ember-bright);
+}
+.page-head .hint {
+  margin: 0;
+}
+.page-head.with-action {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.page-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ember-text);
+}
+.page-section h2 .shell-toggle {
+  margin-left: auto;
+}
+.back-link {
+  align-self: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  text-shadow: none;
+}
+
+/* ---------------------------------------------------------------- settings */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+}
+.settings-nav button {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  color: var(--ember-label);
+  font-size: 13px;
+  text-align: left;
+  border: 1px solid transparent;
+}
+.settings-nav button:hover {
+  color: var(--ember-text);
+  background: rgb(244 247 251 / 0.03);
+}
+.settings-nav button.active {
+  color: var(--ember-bright);
+  background: rgb(244 120 83 / 0.07);
+  border-color: rgb(244 120 83 / 0.2);
+}
+.settings-nav button.active > svg {
+  color: var(--accent);
+}
+.settings-nav button.danger {
+  margin-top: 10px;
+  color: rgb(229 72 77 / 0.85);
+}
+.settings-nav button.danger.active {
+  color: var(--ember-red);
+  background: rgb(229 72 77 / 0.07);
+  border-color: rgb(229 72 77 / 0.3);
+}
+.settings-nav .nav-out {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding-top: 14px;
+}
+.settings-nav .nav-out .out {
+  margin-left: auto;
+  color: var(--ember-dim);
+}
+.settings-body {
+  min-width: 0;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgb(11 17 32 / 0.65);
+}
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.settings-panel > .hint {
+  margin: 0;
+}
+.settings-panel .item-list {
+  margin: 0;
+}
+.copy-fact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.copy-fact code,
+.copy-fact span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.danger-zone {
+  gap: 0;
+}
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid rgb(229 72 77 / 0.18);
+}
+.danger-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.danger-row b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--ember-text);
+}
+.danger-row b > svg {
+  color: var(--ember-red);
+}
+.danger-row .hint {
+  margin: 4px 0 0;
+}
+.danger-row button {
+  flex: none;
+}
+.page-section.danger-zone {
+  padding: 18px 20px;
+  border: 1px solid rgb(229 72 77 / 0.28);
+  border-radius: 10px;
+}
+.page-section.danger-zone h2 {
+  color: var(--ember-red);
+}
+.page-section.danger-zone .danger-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.update-summary {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgb(242 184 102 / 0.35);
+  border-radius: 8px;
+  background: rgb(242 184 102 / 0.05);
+  color: var(--ember-amber);
+  font-size: 13px;
+}
+.update-summary > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.update-summary p {
+  margin: 0;
+  color: var(--ember-text);
+}
+.update-summary p + p {
+  margin-top: 6px;
+}
+.update-summary b {
+  color: var(--ember-amber);
+  font-weight: 700;
+}
+.update-ok {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ember-teal);
+}
+.update-list li.failed {
+  border-left: 2px solid rgb(229 72 77 / 0.6);
+  padding-left: 10px;
+}
+
+/* ---------------------------------------------------------------- lists: chips and filters */
+.list-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.chip {
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ember-label);
+  font-size: 12.5px;
+  background: rgb(7 12 23 / 0.5);
+}
+.chip b {
+  font-weight: 400;
+  color: var(--ember-text);
+}
+.chip.on {
+  color: var(--ember-bright);
+  border-color: rgb(244 120 83 / 0.5);
+  background: rgb(244 120 83 / 0.08);
+}
+.chip.blocked.on {
+  border-color: rgb(255 46 126 / 0.55);
+  background: rgb(255 46 126 / 0.07);
+}
+.list-filter {
+  flex: 1 1 240px;
+  max-width: 380px;
+}
+.shell-toggle {
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ember-label);
+  font-size: 11.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.shell-toggle[aria-pressed="true"] {
+  color: var(--ember-text);
+  border-color: var(--ember-line-high);
+}
+
+/* ---------------------------------------------------------------- tables */
+.agent-table,
+.machine-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgb(11 17 32 / 0.65);
+  font-size: 13px;
+}
+.agent-table th,
+.machine-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--ember-label);
+  border-bottom: 1px solid var(--line);
+  background: rgb(7 12 23 / 0.6);
+  white-space: nowrap;
+}
+.agent-table th button,
+.machine-table th button {
+  gap: 4px;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.agent-table th[aria-sort="ascending"],
+.agent-table th[aria-sort="descending"],
+.machine-table th[aria-sort="ascending"],
+.machine-table th[aria-sort="descending"] {
+  color: var(--ember-text);
+}
+/* Phones hide the headers, so sorting moves to a picker. */
+.sort-pick {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ember-label);
+}
+.sort-pick label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sort-pick select {
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+.agent-table td,
+.machine-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgb(30 42 68 / 0.6);
+  vertical-align: middle;
+  color: var(--ember-soft);
+}
+.agent-table tbody tr:last-child td,
+.machine-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.agent-table tbody tr,
+.machine-table tbody tr {
+  cursor: pointer;
+}
+.agent-table tbody tr:hover td,
+.machine-table tbody tr:hover td {
+  background: rgb(244 120 83 / 0.04);
+}
+.agent-table tr.offline td,
+.machine-table tr.offline td {
+  opacity: 0.6;
+}
+.agent-table .col-agent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+}
+.agent-table .col-agent .harness {
+  flex: none;
+}
+.agent-open {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0;
+  min-width: 0;
+  text-align: left;
+}
+.agent-open b {
+  color: var(--ember-bright);
+  font-size: 13px;
+}
+.agent-open small {
+  font-size: 11.5px;
+  color: var(--ember-label);
+}
+.agent-table .col-task {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-table .col-where,
+.agent-table .col-activity {
+  white-space: nowrap;
+  color: var(--ember-label);
+}
+.agent-table .col-where {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-table .col-state {
+  white-space: nowrap;
+}
+.agent-table .col-state .for {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--ember-label);
+}
+.agent-table tr.shell .agent-open b {
+  font-weight: 400;
+  color: var(--ember-soft);
+}
+
+.machine-table .col-machine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.machine-table .col-num {
+  text-align: right;
+}
+.machine-table .mark,
+.machine-head .mark,
+.dock-card .mark {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--ember-label);
+}
+.machine-table .mark .dot,
+.machine-head .mark .dot,
+.dock-card .mark .dot {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+}
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 2px 6px 2px 0;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--ember-text);
+}
+.user-chip.off {
+  color: var(--ember-label);
+  border-style: dashed;
+}
+.machine-table .group-tag {
+  margin: 2px 4px 2px 0;
+}
+.machine-table .count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 11.5px;
+}
+.machine-table .behind {
+  color: var(--ember-amber);
+}
+.machine-table .badge {
+  margin-left: 6px;
+}
+
+/* ---------------------------------------------------------------- one machine */
+.machine-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.machine-head .mark.big {
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgb(11 17 32 / 0.7);
+}
+.machine-head h1 {
+  margin: 0 0 2px;
+}
+.dock-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.dock-card {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgb(11 17 32 / 0.65);
+}
+.dock-card.offline {
+  opacity: 0.75;
+}
+.dock-card header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+.dock-card header b {
+  color: var(--ember-bright);
+}
+.dock-card header .icon-button {
+  margin-left: auto;
+}
+.dock-card .facts {
+  font-size: 12.5px;
+}
+.empty-agents {
+  padding: 22px;
+  border: 1px dashed var(--ember-line-high);
+  border-radius: 10px;
+  color: var(--ember-text);
+}
+.empty-agents .hint {
+  margin: 6px 0 0;
+}
+
+/* ---------------------------------------------------------------- overview: counters are filters */
+button.readout {
+  border-radius: 0;
+  text-align: left;
+  color: inherit;
+  justify-content: flex-start;
+}
+button.readout:hover {
+  background: rgb(244 247 251 / 0.03);
+  filter: none;
+}
+button.readout:hover .readout-label {
+  color: var(--ember-bright);
+}
+
+/* ---------------------------------------------------------------- the pane header */
+.back-button {
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  color: var(--ember-label);
+  font-size: 12px;
+  flex: none;
+}
+.back-button:hover {
+  color: var(--ember-text);
+  background: rgb(244 247 251 / 0.04);
+}
+.crumbs .crumb {
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.crumbs button.crumb:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.crumbs .crumb.host {
+  color: var(--ember-text);
+  flex: none;
+}
+.pane-actions .step {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.pane-actions .step .icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+}
+.pane-actions .step .icon-button + .icon-button {
+  border-left: 1px solid var(--line);
+}
+.pane-actions .whole[aria-pressed="true"] {
+  color: var(--ember-text);
+  border-color: var(--ember-line-high);
+}
+
+/* ---------------------------------------------------------------- sidebar: arrange by, shells */
+.tree-switches {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 1 1 100%;
+}
+.tree-switches .view-toggle {
+  flex: 1;
+}
+.tree-switches .shell-toggle {
+  margin-bottom: 5px;
+  padding: 3px 7px;
+  font-size: 10.5px;
+}
+
+/* ---------------------------------------------------------------- notifications */
+.bell-button {
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ember-label);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.bell-button:hover {
+  color: var(--ember-text);
+}
+.bell-button.on {
+  color: var(--accent);
+  border-color: rgb(244 120 83 / 0.4);
+}
+
+/* ---------------------------------------------------------------- the command palette */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: min(14vh, 120px) 16px 16px;
+  background: rgb(3 6 14 / 0.6);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.palette {
+  width: min(640px, 100%);
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ember-line-high);
+  border-radius: 12px;
+  background: rgb(14 20 36 / 0.98);
+  box-shadow: 0 30px 90px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(244 120 83 / 0.06);
+  overflow: hidden;
+}
+.palette-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ember-label);
+}
+.palette-input input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 0;
+  font-size: 15px;
+  color: var(--ember-bright);
+}
+.palette-input input:focus {
+  box-shadow: none;
+}
+.palette-list {
+  overflow: auto;
+  padding: 6px;
+}
+.palette-group {
+  padding: 10px 10px 4px;
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ember-dim);
+}
+.palette-item {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+.palette-item.active {
+  background: rgb(244 120 83 / 0.09);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.palette-item.offline {
+  opacity: 0.6;
+}
+.palette-item .harness {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+.pi-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ember-label);
+}
+.pi-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pi-text b,
+.pi-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pi-text b {
+  font-size: 13.5px;
+  color: var(--ember-bright);
+}
+.pi-text small {
+  font-size: 11.5px;
+  color: var(--ember-label);
+}
+.pi-go {
+  color: var(--ember-dim);
+}
+.palette-item.active .pi-go {
+  color: var(--accent);
+}
+.palette-empty {
+  padding: 20px 12px;
+  color: var(--ember-label);
+  font-size: 13px;
+}
+.palette-foot {
+  display: flex;
+  gap: 18px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--ember-dim);
+}
+.palette-foot kbd {
+  margin-right: 3px;
+}
+
+/* ---------------------------------------------------------------- laptop widths */
+@media (max-width: 1180px) {
+  .top-nav button .nav-count {
+    display: none;
+  }
+  .agent-table .col-task {
+    max-width: 220px;
+  }
+}
+@media (max-width: 1080px) {
+  .search-button .nav-label {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .top-nav .nav-label {
+    display: none;
+  }
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .settings-nav button {
+    flex: none;
+  }
+  .settings-nav button.danger,
+  .settings-nav .nav-out {
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 9px;
+  }
+  .agent-table .col-task,
+  .machine-table .col-groups {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- phone: tables become cards */
+@media (max-width: 480px) {
+  .brand-identity {
+    display: none;
+  }
+  .top-nav {
+    padding-left: 0;
+  }
+  .top-nav button {
+    padding: 8px;
+  }
+}
+@media (max-width: 700px) {
+  .connection .label,
+  .search-button kbd {
+    display: none;
+  }
+  .settings-body {
+    padding: 16px;
+  }
+  .danger-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .agent-table thead,
+  .machine-table thead {
+    display: none;
+  }
+  .sort-pick {
+    display: flex;
+  }
+  .agent-table,
+  .agent-table tbody,
+  .machine-table,
+  .machine-table tbody {
+    display: block;
+  }
+  .agent-table tr,
+  .machine-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .agent-table td,
+  .machine-table td {
+    padding: 0;
+    border: 0;
+  }
+  .agent-table .col-where {
+    grid-column: 1;
+    min-width: 0;
+    font-size: 12px;
+    white-space: normal;
+  }
+  .agent-table .col-task {
+    display: block;
+    grid-column: 1 / -1;
+    max-width: none;
+    font-size: 12px;
+    color: var(--ember-soft);
+  }
+  .agent-table .col-state {
+    grid-row: 1;
+    grid-column: 2;
+    text-align: right;
+  }
+  .agent-table .col-activity {
+    grid-column: 2;
+    text-align: right;
+    font-size: 12px;
+  }
+  .machine-table td:not(.col-machine) {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .machine-table td[data-label]::before {
+    content: attr(data-label);
+    min-width: 92px;
+    color: var(--ember-dim);
+  }
+  .machine-table .col-num {
+    text-align: left;
+  }
+  .dock-cards {
+    grid-template-columns: 1fr;
+  }
+  .page-section.danger-zone {
+    padding: 14px;
+  }
+}
+
+/* Settings panels: what the old dialog gave its labels and lists */
+.settings-panel .fleet-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-panel .fleet-name-form > label {
+  font-size: 13.5px;
+  color: var(--ember-text);
+}
+.settings-panel .fleet-name-form .hint,
+.settings-panel .fleet-name-form .saved-note {
+  margin: 0;
+}
+.update-settings .check-text small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.settings-panel .update-settings {
+  margin: 4px 0;
+}
+
+/* In a narrow tree row the agent's name wins over its group tag: the tag gives way first. */
+.tree-row .two > span > .name {
+  flex: 0 1 auto;
+  min-width: min(7em, 50%);
+}
+.tree-row .two > span > .group-tag {
+  flex: 0 1 auto;
+  min-width: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

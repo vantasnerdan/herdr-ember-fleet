@@ -15,9 +15,20 @@ const where = (p: PaneInfo) =>
 const bell = computed(() => {
   if (!alerts.supported) return undefined;
   if (alerts.permission === "denied")
-    return { icon: BellOff, title: "Notifications are blocked for this page in the browser's site settings", disabled: true };
-  if (alerts.on) return { icon: BellRing, title: "Notifications are on: you hear about every agent that turns blocked. Click to turn off.", disabled: false };
-  return { icon: Bell, title: "Notify me when an agent turns blocked", disabled: false };
+    return {
+      icon: BellOff,
+      text: "Alerts blocked",
+      title: "This browser blocks notifications for this page. Allow them in the site settings (the icon left of the address), then reload.",
+      disabled: true,
+    };
+  if (alerts.on)
+    return { icon: BellRing, text: "Alerts on", title: "You get a notification whenever an agent needs you. Click to turn off.", disabled: false };
+  return {
+    icon: Bell,
+    text: "Notify me",
+    title: "Get a desktop notification whenever an agent needs you (the browser asks first)",
+    disabled: false,
+  };
 });
 
 function toggleBell() {
@@ -32,18 +43,17 @@ function toggleBell() {
       <span v-if="blocked.length" class="title"
         >NEEDS YOU · {{ blocked.length }}</span
       >
-      <span v-else class="calm-text">No agent is waiting on you.</span>
+      <span v-else class="calm-text">Nothing needs you.</span>
       <button
         v-if="bell"
-        class="icon-button"
+        class="bell-button"
         :class="{ on: alerts.on }"
         :disabled="bell.disabled"
         :title="bell.title"
-        :aria-label="bell.title"
         :aria-pressed="alerts.on"
         @click="toggleBell"
       >
-        <component :is="bell.icon" :size="16" />
+        <component :is="bell.icon" :size="14" /><span>{{ bell.text }}</span>
       </button>
     </div>
     <ul v-if="blocked.length" class="needs-list">

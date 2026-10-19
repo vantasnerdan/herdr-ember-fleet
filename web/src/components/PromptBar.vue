@@ -170,7 +170,7 @@ defineExpose({ addFiles });
         v-model="text"
         rows="1"
         :disabled="disabled"
-        :placeholder="disabled ? 'Read-only' : `Prompt ${pane.name}…`"
+        :placeholder="disabled ? 'Read-only' : `Prompt ${pane.label} (sends without taking control)`"
         :aria-label="`Prompt for ${pane.name}`"
         enterkeyhint="send"
         @keydown="keydown"
