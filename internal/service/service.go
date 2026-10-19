@@ -139,6 +139,23 @@ func installSystemd(role string, full []string, system bool) (string, error) {
 		run("sudo", "systemctl", "restart", name)
 		return fmt.Sprintf("installed system service %s (runs as %s); logs: journalctl -u %s -f", name, u.Username, unitName(role)), nil
 	}
+	// `sudo -iu agent` shells have no XDG_RUNTIME_DIR; systemctl --user needs it.
+	if os.Getenv("XDG_RUNTIME_DIR") == "" {
+		if rd := fmt.Sprintf("/run/user/%d", os.Getuid()); dirExists(rd) {
+			os.Setenv("XDG_RUNTIME_DIR", rd)
+		}
+	}
+	lingerMsg := ""
+	if out, _ := exec.Command("loginctl", "show-user", u.Username, "-p", "Linger", "--value").Output(); strings.TrimSpace(string(out)) != "yes" {
+		if err := exec.Command("loginctl", "enable-linger", u.Username).Run(); err != nil {
+			lingerMsg = "\nTo keep it running when you are logged out, an administrator runs: sudo loginctl enable-linger " + u.Username
+		} else {
+			lingerMsg = "\nturned on lingering, so it keeps running when you are logged out"
+		}
+	}
+	if os.Getenv("XDG_RUNTIME_DIR") == "" || !dirExists(os.Getenv("XDG_RUNTIME_DIR")) {
+		return "", fmt.Errorf("no user service manager is running for %s; an administrator runs `sudo loginctl enable-linger %s`, then run this again", u.Username, u.Username)
+	}
 	dir := filepath.Join(u.HomeDir, ".config", "systemd", "user")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
@@ -153,15 +170,7 @@ func installSystemd(role string, full []string, system bool) (string, error) {
 		return "", err
 	}
 	run("systemctl", "--user", "restart", name)
-	msg := fmt.Sprintf("installed user service %s; logs: journalctl --user -u %s -f", name, unitName(role))
-	if out, _ := exec.Command("loginctl", "show-user", u.Username, "-p", "Linger", "--value").Output(); strings.TrimSpace(string(out)) != "yes" {
-		if err := exec.Command("loginctl", "enable-linger", u.Username).Run(); err != nil {
-			msg += "\nTo keep it running when you are logged out, an administrator runs: sudo loginctl enable-linger " + u.Username
-		} else {
-			msg += "\nturned on lingering, so it keeps running when you are logged out"
-		}
-	}
-	return msg, nil
+	return fmt.Sprintf("installed user service %s; logs: journalctl --user -u %s -f", name, unitName(role)) + lingerMsg, nil
 }
 
 func installLaunchd(role string, full []string) (string, error) {
@@ -219,4 +228,9 @@ func run(name string, args ...string) error {
 		return fmt.Errorf("%s %s: %v: %s", name, strings.Join(args, " "), err, strings.TrimSpace(out.String()))
 	}
 	return nil
+}
+
+func dirExists(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && st.IsDir()
 }
